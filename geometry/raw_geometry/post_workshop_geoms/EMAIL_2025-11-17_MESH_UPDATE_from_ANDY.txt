@@ -1,0 +1,35 @@
+From: Andy Howell <andrew.howell@canterbury.ac.nz>
+Subject: New meshes for earthquake simulator intercomparison
+Date: November 17, 2025 at 3:13:24 AM CST
+To: Jamie Howarth <jamie.howarth@vuw.ac.nz>, "Ryo Ando <ando@eps.s.u-tokyo.ac.jp>" <ando@eps.s.u-tokyo.ac.jp>, Avinash Gupta <avinash.gupta@canterbury.ac.nz>, Camilla Penney <camilla.penney@canterbury.ac.nz>, "Becker, Thorsten" <twb@ig.utexas.edu>, Olaf Zielke <olaf.zielke@kaust.edu.sa>, Aisling O'Kane <aisling.okane@vuw.ac.nz>, Yoshihiro Kaneko <kaneko.yoshihiro.4e@kyoto-u.ac.jp>, Duo Li <d.li@gns.cri.nz>, "Sun, Huiwen" <hs32743@my.utexas.edu>, "algabriel@ucsd.edu" <algabriel@ucsd.edu>, Jeena Yun <jeena.yun7@gmail.com>, Duo Li <d.li@gns.cri.nz>
+Cc: Chris Rollins <c.rollins@gns.cri.nz>
+
+---
+
+Kia ora koutou,
+
+Sorry for the delay getting stuff out. It has taken a while to get a geometry we are happy with - and there are still a few issues getting it to work with Tandem, but we are getting there.
+
+Just a warning, I'm writing this at 10 pm and may not entirely make sense. If anything contradicts Jamie's original email (copied below), go with the original email. Also, if you have queries just ask.
+
+NEW MESHES:
+I have uploaded gmsh .geo scripts and .stl files for the planar and variable_dip geometries to the google drive here.
+
+The idea is that for the more computationally simulators, these geometries can be trimmed (in gmsh or something else) to model a shorter length of fault... Ideally this would still include the southern two paleoseismic sites (here). Please get in touch if you'd like to talk over methods for doing that. Also just shout if you'd like an to explore alternate export formats (Olaf?).
+
+Coordinates are in metres, in NZTM (EPSG:2193) projection.
+
+Avi has created two .geo files for the planar geometry using two different approaches (the 4 corners and the average strike and dip). Use whichever suits you; for whatever reason, the average strike/dip one makes a cleaner mesh, but the underlying geometries are nearly identical.
+
+CONSTRAINING DATA:
+Slip rates for individual fault segments are here, the geometries are defined above. If stress tensors are useful, some key info is here. The idea is to tune model parameters (within sensible limits) to match single-event displacements and recurrence intervals (here) at the southern two paleoseismic sites and (optionally) the northern site.
+
+GNSS DATA:
+Following Yoshi's suggestion, we (collectively) decided to use GNSS data as either a validation dataset or (possibly, in some cases) to inform model loading. Chris Rollins has kindly supplied his latest GNSS compilation (attached), which currently covers all NZ and is in an Australian Plate-fixed reference frame... In lieu of a scale, the velocity at Christchurch is 34 mm/yr.
+
+If anyone has any suggestions about how to cut this velocity field to a more suitable size for the current exercise, please let me know. Similarly, if a better reference frame would suit, just shout. Otherwise, Chris and I can come up with a straw-person velocity subset in the next week or so.
+
+Any questions, just fire away! Thanks for your patience.
+
+Cheers,
+Andy

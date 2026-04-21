@@ -1,0 +1,43 @@
+================================================================================
+STL TO FAULT GRID PROCESSING SUMMARY
+================================================================================
+
+Processing Date: 2025-08-05 13:24:49
+STL File: no_dip_change_1km.stl
+Output Folder: /Users/dliu/scratch/alpine/no_dip_change_1km.res4km
+
+BASIC PROCESSING PARAMETERS:
+----------------------------------------
+Grid Resolution: 4.0 km
+Grid Dimensions: 191 x 14
+X Range: -380 to 380 km
+Z Range: 0 to -50 km
+Total Points: 2674
+Original Strike Angle: 36.89°
+
+SMOOTHING CONTROL:
+----------------------------------------
+Method: none
+
+VERTICAL TRANSITION:
+----------------------------------------
+Enabled: False
+
+SMOOTHNESS ANALYSIS:
+----------------------------------------
+Original Smoothness Score: 4.877181
+Processed Smoothness Score: 5.297038
+Average Preservation Ratio: 6.672
+Preservation Quality: POOR
+
+OUTPUT FILES:
+----------------------------------------
+• no_dip_change_1km.res4km_Geometry.txt (main output for EQQuasi)
+• no_dip_change_1km.res4km_grid.csv (tabular data)
+• no_dip_change_1km.res4km_grid.npz (numpy arrays)
+• no_dip_change_1km.res4km_smoothness_report.txt (detailed smoothness analysis)
+• no_dip_change_1km.res4km_processing.png (processing visualization)
+• no_dip_change_1km.res4km_smoothness_analysis.png (original STL smoothness)
+• no_dip_change_1km.res4km_processed_smoothness_analysis.png (processed mesh smoothness)
+• no_dip_change_1km.res4km_smoothness_comparison.png (preservation comparison)
+• no_dip_change_1km.res4km_summary.txt (this file)

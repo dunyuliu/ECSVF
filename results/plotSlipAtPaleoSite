@@ -1,0 +1,661 @@
+#! /usr/bin/env python3
+"""
+Script to plot accumulated slip at a single station at the free surface (depth 100%).
+This is useful for analyzing paleoseismic sites where you want to track slip at a specific location.
+"""
+
+import xarray as xr
+import matplotlib.pyplot as plt
+import numpy as np
+import os, glob, re, sys
+from user_defined_params import par
+from lib import *
+
+# Set matplotlib parameters for improved readability
+plt.rcParams.update({
+    'font.size': 12,           # Base font size
+    'axes.titlesize': 14,      # Title font size
+    'axes.labelsize': 13,      # Axis label font size  
+    'xtick.labelsize': 11,     # X-axis tick label size
+    'ytick.labelsize': 11,     # Y-axis tick label size
+    'legend.fontsize': 10,     # Legend font size
+    'font.family': 'DejaVu Sans',  # Clean, readable font
+    'axes.linewidth': 1.2,     # Thicker axis lines
+    'grid.linewidth': 0.8,     # Grid line thickness
+    'lines.linewidth': 2,      # Default line thickness
+})
+
+ninterval = 1  # plot results in every step for time series
+
+def extract_slip_at_station(model_path, station_pct, ninterval):
+    """Extract slip time series at a single station at free surface (depth 100%)"""
+    filenames = glob.glob(model_path+'/fault.?????.nc')
+    filenames = sort_nicely(filenames)
+    num_files = len(filenames)
+    
+    if num_files == 0:
+        print(f"No fault files found in {model_path}")
+        return None, None, None
+    
+    global_time = np.loadtxt(model_path + '/global.dat', usecols=0)
+
+    # Get grid dimensions from restart file
+    restart_file = model_path + '/fault.r.nc'
+    if not os.path.exists(restart_file):
+        print(f"Restart file not found: {restart_file}")
+        return None, None, None
+        
+    a = xr.open_dataset(restart_file)
+    shear_strike = a.shear_strike
+    num_rows = shear_strike.shape[0]
+    num_cols = shear_strike.shape[1]
+    
+    # Calculate station position
+    col_index = int(round((station_pct / 100.0) * (num_cols - 1)))
+    col_index = max(0, min(col_index, num_cols - 1))
+    actual_station_pct = (col_index / (num_cols - 1)) * 100
+    
+    # Free surface is at depth 100% (bottom row index)
+    row_index = num_rows - 1
+    
+    print(f'Grid dimensions: {num_files} files, {num_rows} rows, {num_cols} cols')
+    print(f'Station at {actual_station_pct:.1f}% along strike (column {col_index})')
+    print(f'Free surface at depth 100% (row {row_index})')
+    
+    # Extract slip time series
+    slip_data = np.zeros(num_files)
+    time_steps = []
+    time_seconds = []
+    for i, filename in enumerate(filenames):
+        b = xr.open_dataset(filename)
+        slip_data[i] = b.slips[row_index, col_index]
+        
+        # Extract time step from filename (fault.XXXXX.nc)
+        time_step = int(filename.split('.')[-2])
+        time_steps.append(time_step)
+        time_seconds.append(global_time[time_step-1])
+    
+    # Subsample based on ninterval
+    if ninterval > 1:
+        slip_data = slip_data[::ninterval]
+        time_steps = time_steps[::ninterval]
+    
+    return slip_data, time_steps, actual_station_pct, time_seconds
+
+def plot_accumulated_slip_at_station(ncyc, station_pct, ninterval=1, slip_threshold=0.1):
+    """Plot accumulated slip at a single station across all cycles"""
+    print(f"\n=== Plotting Accumulated Slip at Paleoseismic Site ===")
+    print(f"Station position: {station_pct}% along strike")
+    print(f"Depth: 100% (free surface)")
+    
+    all_slip_data = []
+    all_time_steps = []
+    all_time_seconds = []
+    cycle_boundaries = [0]  # Track where each cycle starts/ends
+    
+    for i in range(ncyc):
+        model_path = 'Q' + str(i)
+        print(f'\nProcessing cycle {i}...')
+        
+        slip_data, time_steps, actual_station_pct, time_seconds = extract_slip_at_station(model_path, station_pct, ninterval)
+        
+        if slip_data is None:
+            print(f"Skipping cycle {i} due to missing data")
+            continue
+            
+        if i == 0:
+            # First cycle - use as is
+            all_slip_data.extend(slip_data)
+            all_time_steps.extend(time_steps)
+            all_time_seconds.extend(time_seconds)
+        else:
+            # Subsequent cycles - add to accumulated slip from previous cycles
+            accumulated_offset = all_slip_data[-1] if all_slip_data else 0
+            accumulated_slip = slip_data + accumulated_offset
+            all_slip_data.extend(accumulated_slip)
+
+            # Adjust time steps to be continuous
+            time_offset = all_time_steps[-1] + (time_steps[1] - time_steps[0]) if all_time_steps else 0
+            adjusted_time_steps = [t + time_offset for t in time_steps]
+            all_time_steps.extend(adjusted_time_steps)
+
+            # Adjust time in seconds to be continuous
+            time_offset_seconds = all_time_seconds[-1] + (time_seconds[1] - time_seconds[0]) if all_time_seconds else 0
+            adjusted_time_seconds = [t + time_offset_seconds for t in time_seconds]
+            all_time_seconds.extend(adjusted_time_seconds)
+        
+        cycle_boundaries.append(len(all_slip_data))
+    
+    if not all_slip_data:
+        print("No data to plot!")
+        return
+    
+    # Convert to numpy arrays
+    all_slip_data = np.array(all_slip_data)
+    all_time_steps = np.array(all_time_steps)
+    all_time_seconds = np.array(all_time_seconds)
+
+    # Convert time to different units
+    time_days = all_time_seconds / (24 * 3600)
+    time_years = time_days / 365.25
+    
+    print(f"\nTotal data points: {len(all_slip_data)}")
+    print(f"Final accumulated slip: {all_slip_data[-1]:.3f} m")
+    print(f"Total time: {time_years[-1]:.2f} years ({time_days[-1]:.1f} days)")
+    
+    # Detect earthquake events based on Q folder slip increments
+    def detect_events_by_slip_threshold(cycle_boundaries, slip_data, time_data, threshold=0.1):
+        """Detect earthquake events by Q folder slip accumulation with threshold"""
+        event_times = []
+        event_slip_values = []
+        event_q_ranges = []  # Track which Q folders are included in each event
+        accumulated_slip = 0.0
+        event_start_q = 0
+        
+        print(f"\nAnalyzing Q folders with slip threshold: {threshold} m")
+        
+        for i in range(len(cycle_boundaries)-1):
+            start_idx = cycle_boundaries[i]
+            end_idx = cycle_boundaries[i+1] - 1
+            
+            if start_idx < len(slip_data) and end_idx < len(slip_data):
+                # Calculate slip increment for this Q folder
+                slip_increment = slip_data[end_idx] - slip_data[start_idx]
+                accumulated_slip += slip_increment
+                
+                print(f"  Q{i}: slip increment = {slip_increment:.3f} m, accumulated = {accumulated_slip:.3f} m")
+                
+                # Check if accumulated slip exceeds threshold
+                if accumulated_slip >= threshold:
+                    # This completes an earthquake event
+                    event_time = time_data[end_idx]  # Time at end of this Q folder
+                    event_slip = slip_data[end_idx]  # Total slip at this point
+                    
+                    event_times.append(event_time)
+                    event_slip_values.append(event_slip)
+                    event_q_ranges.append((event_start_q, i))  # Q range for this event
+                    
+                    print(f"    -> EVENT detected! Q{event_start_q}-Q{i}, total slip: {event_slip:.3f} m")
+                    
+                    # Reset for next event
+                    accumulated_slip = 0.0
+                    event_start_q = i + 1
+        
+        return event_times, event_slip_values, event_q_ranges
+    
+    # Use the provided slip threshold for earthquake detection
+    event_times, event_slip_values, event_q_ranges = detect_events_by_slip_threshold(
+        cycle_boundaries, all_slip_data, time_years, slip_threshold)
+    
+    # Calculate recurrence times between earthquake events
+    recurrence_times = []
+    if len(event_times) > 1:
+        for i in range(1, len(event_times)):
+            recurrence_time = event_times[i] - event_times[i-1]
+            recurrence_times.append(recurrence_time)
+    
+    print(f"\nDetected {len(event_times)} earthquake events:")
+    for i, (time_val, slip_val, q_range) in enumerate(zip(event_times, event_slip_values, event_q_ranges)):
+        q_start, q_end = q_range
+        if q_start == q_end:
+            q_str = f"Q{q_start}"
+        else:
+            q_str = f"Q{q_start}-Q{q_end}"
+        print(f"  Event {i+1}: {q_str}, t={time_val:.2f} years, slip={slip_val:.3f} m")
+    
+    # Create two subplots with improved styling
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 10))
+    
+    # Enhanced colors for better visibility
+    colors = ['#d62728', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22']
+    
+    # Plot 1: Time in years
+    ax1.plot(time_years, all_slip_data, '#1f77b4', linewidth=2.5, label='Accumulated Slip', zorder=3)
+    
+    # Add earthquake event markers for years plot
+    num_events = len(event_times)
+    show_legend = num_events <= 10  # Only show legend if 10 or fewer events
+    
+    for i, event_time in enumerate(event_times):
+        color = colors[i % len(colors)]
+        label = f'Event {i+1}' if show_legend else None
+        ax1.axvline(x=event_time, color=color, linestyle='--', alpha=0.8, 
+                   linewidth=2, label=label, zorder=2)
+    
+    # Also keep Q folder boundaries as light gray lines for reference
+    for i in range(1, len(cycle_boundaries)-1):
+        boundary_idx = cycle_boundaries[i] - 1
+        if boundary_idx < len(time_years):
+            ax1.axvline(x=time_years[boundary_idx], color='lightgray', linestyle=':', alpha=0.5, 
+                       linewidth=1, zorder=1)
+    
+    # Add recurrence time labels for earthquake events
+    for i in range(len(event_times)):
+        event_time = event_times[i]
+        event_slip = event_slip_values[i]
+        q_start, q_end = event_q_ranges[i]
+        
+        # Position label above the curve
+        y_range = np.max(all_slip_data) - np.min(all_slip_data)
+        label_offset = y_range * 0.08  # 8% of total range above the curve
+        label_y = event_slip + label_offset
+        
+        # Create label text with Q range and recurrence time
+        if q_start == q_end:
+            q_str = f"Q{q_start}"
+        else:
+            q_str = f"Q{q_start}-{q_end}"
+        
+        if i > 0 and i-1 < len(recurrence_times):
+            recur_time = recurrence_times[i-1]
+            label_text = f'E{i+1}\n{q_str}\n{recur_time:.1f}y'
+        else:
+            label_text = f'E{i+1}\n{q_str}'
+        
+        # Add label on top of curve
+        ax1.text(event_time, label_y, label_text, 
+                horizontalalignment='center', verticalalignment='bottom',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.8, edgecolor='orange'),
+                fontsize=9, fontweight='bold', zorder=4)
+    
+    ax1.set_xlabel('Time (years)', fontweight='bold')
+    ax1.set_ylabel('Accumulated Slip (m)', fontweight='bold')
+    ax1.set_title(f'Accumulated Slip at Paleoseismic Site\n({actual_station_pct:.1f}% Along Strike, Free Surface)', 
+                  fontweight='bold', pad=20)
+    ax1.grid(True, alpha=0.4, linestyle='-', linewidth=0.5)
+    if show_legend:
+        ax1.legend(frameon=True, framealpha=0.9, edgecolor='black', fancybox=False, 
+                  loc='upper left', ncol=2 if num_events > 5 else 1)
+    else:
+        # Add a note about events when legend is hidden
+        ax1.text(0.02, 0.98, f'Dashed lines: earthquake events ({num_events} events)', 
+                transform=ax1.transAxes, verticalalignment='top',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor='gray'),
+                fontsize=9)
+    
+    # Add note about Q folder boundaries
+    ax1.text(0.02, 0.92, f'Dotted lines: Q folder boundaries ({len(cycle_boundaries)-1} folders)', 
+            transform=ax1.transAxes, verticalalignment='top',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgray', alpha=0.6, edgecolor='gray'),
+            fontsize=8)
+    ax1.set_axisbelow(True)
+    
+    # Plot 2: Time steps
+    ax2.plot(all_time_steps, all_slip_data, '#d62728', linewidth=2.5, label='Accumulated Slip', zorder=3)
+    
+    # Add earthquake event markers for time steps plot
+    for i, event_time in enumerate(event_times):
+        # Find closest time step index for this event time
+        event_idx = np.argmin(np.abs(time_years - event_time))
+        color = colors[i % len(colors)]
+        label = f'Event {i+1}' if show_legend else None
+        ax2.axvline(x=all_time_steps[event_idx], color=color, linestyle='--', alpha=0.8, 
+                   linewidth=2, label=label, zorder=2)
+    
+    # Also keep Q folder boundaries as light gray lines for reference
+    for i in range(1, len(cycle_boundaries)-1):
+        boundary_idx = cycle_boundaries[i] - 1
+        if boundary_idx < len(all_time_steps):
+            ax2.axvline(x=all_time_steps[boundary_idx], color='lightgray', linestyle=':', alpha=0.5, 
+                       linewidth=1, zorder=1)
+    
+    ax2.set_xlabel('Time Steps', fontweight='bold')
+    ax2.set_ylabel('Accumulated Slip (m)', fontweight='bold')
+    ax2.set_title('Time Scale: Time Steps', fontweight='bold', pad=15)
+    ax2.grid(True, alpha=0.4, linestyle='-', linewidth=0.5)
+    if show_legend:
+        ax2.legend(frameon=True, framealpha=0.9, edgecolor='black', fancybox=False, 
+                  loc='upper left', ncol=2 if num_events > 5 else 1)
+    else:
+        # Add a note about events when legend is hidden
+        ax2.text(0.02, 0.98, f'Dashed lines: earthquake events ({num_events} events)', 
+                transform=ax2.transAxes, verticalalignment='top',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor='gray'),
+                fontsize=9)
+    ax2.set_axisbelow(True)
+    
+    # Format numbers on axes for better readability
+    for ax in [ax1, ax2]:
+        ax.ticklabel_format(style='scientific', axis='x', scilimits=(-3,3))
+        ax.tick_params(which='major', length=6, width=1.2)
+        ax.tick_params(which='minor', length=3, width=0.8)
+    
+    plt.tight_layout(pad=2.0)
+    
+    # Save the plot with higher DPI for clarity
+    out_file = f'c.paleosite_slip_{actual_station_pct:.1f}pct_two_timescales_improved.png'
+    plt.savefig(out_file, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    print(f'\nSaved: {out_file}')
+    
+    # Also create individual plots for each time scale with 8x6 size
+    
+    # Years plot
+    plt.figure(figsize=(8, 6))
+    plt.plot(time_years, all_slip_data, '#1f77b4', linewidth=2.5, label='Accumulated Slip', zorder=3)
+    
+    # Add earthquake event markers
+    for i, event_time in enumerate(event_times):
+        color = colors[i % len(colors)]
+        label = f'Event {i+1}' if show_legend else None
+        plt.axvline(x=event_time, color=color, linestyle='--', alpha=0.8, 
+                   linewidth=2, label=label, zorder=2)
+    
+    # Add Q folder boundaries as light gray lines for reference
+    for i in range(1, len(cycle_boundaries)-1):
+        boundary_idx = cycle_boundaries[i] - 1
+        if boundary_idx < len(time_years):
+            plt.axvline(x=time_years[boundary_idx], color='lightgray', linestyle=':', alpha=0.5, 
+                       linewidth=1, zorder=1)
+    
+    # Add labels on top of curves for individual years plot
+    for i in range(len(event_times)):
+        event_time = event_times[i]
+        event_slip = event_slip_values[i]
+        q_start, q_end = event_q_ranges[i]
+        
+        # Position label above the curve
+        y_range = np.max(all_slip_data) - np.min(all_slip_data)
+        label_offset = y_range * 0.08  # 8% of total range above the curve
+        label_y = event_slip + label_offset
+        
+        # Create label text with Q range and recurrence time
+        if q_start == q_end:
+            q_str = f"Q{q_start}"
+        else:
+            q_str = f"Q{q_start}-{q_end}"
+        
+        if i > 0 and i-1 < len(recurrence_times):
+            recur_time = recurrence_times[i-1]
+            label_text = f'E{i+1}\n{q_str}\n{recur_time:.1f}y'
+        else:
+            label_text = f'E{i+1}\n{q_str}'
+        
+        # Add label on top of curve
+        plt.text(event_time, label_y, label_text, 
+                horizontalalignment='center', verticalalignment='bottom',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.8, edgecolor='orange'),
+                fontsize=9, fontweight='bold', zorder=4)
+    
+    plt.xlabel('Time (years)', fontweight='bold')
+    plt.ylabel('Accumulated Slip (m)', fontweight='bold')
+    plt.title(f'Accumulated Slip at Paleoseismic Site - Years\n({actual_station_pct:.1f}% Along Strike)', 
+              fontweight='bold', pad=15)
+    plt.grid(True, alpha=0.4, linestyle='-', linewidth=0.5)
+    if show_legend:
+        plt.legend(frameon=True, framealpha=0.9, edgecolor='black', fancybox=False, 
+                  loc='upper left', ncol=2 if num_events > 5 else 1)
+    else:
+        # Add a note about events when legend is hidden
+        plt.text(0.02, 0.98, f'Dashed lines: earthquake events ({num_events} events)', 
+                transform=plt.gca().transAxes, verticalalignment='top',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor='gray'),
+                fontsize=9)
+    plt.gca().set_axisbelow(True)
+    plt.gca().ticklabel_format(style='scientific', axis='x', scilimits=(-3,3))
+    plt.tick_params(which='major', length=6, width=1.2)
+    plt.tight_layout()
+    years_file = f'c.paleosite_slip_{actual_station_pct:.1f}pct_years_improved.png'
+    plt.savefig(years_file, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    print(f'Saved: {years_file}')
+    
+    # Days plot
+    plt.figure(figsize=(8, 6))
+    plt.plot(time_days, all_slip_data, '#2ca02c', linewidth=2.5, label='Accumulated Slip', zorder=3)
+    for i in range(1, len(cycle_boundaries)-1):
+        boundary_idx = cycle_boundaries[i] - 1
+        if boundary_idx < len(time_days):
+            color = colors[(i-1) % len(colors)]
+            plt.axvline(x=time_days[boundary_idx], color=color, linestyle='--', alpha=0.8, 
+                       linewidth=2, label=f'End Cycle {i-1}', zorder=2)
+    plt.xlabel('Time (days)', fontweight='bold')
+    plt.ylabel('Accumulated Slip (m)', fontweight='bold')
+    plt.title(f'Accumulated Slip at Paleoseismic Site - Days\n({actual_station_pct:.1f}% Along Strike)', 
+              fontweight='bold', pad=15)
+    plt.grid(True, alpha=0.4, linestyle='-', linewidth=0.5)
+    plt.legend(frameon=True, framealpha=0.9, edgecolor='black', fancybox=False)
+    plt.gca().set_axisbelow(True)
+    plt.gca().ticklabel_format(style='scientific', axis='x', scilimits=(-3,3))
+    plt.tick_params(which='major', length=6, width=1.2)
+    plt.tight_layout()
+    days_file = f'c.paleosite_slip_{actual_station_pct:.1f}pct_days_improved.png'
+    plt.savefig(days_file, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    print(f'Saved: {days_file}')
+    
+    # Time steps plot  
+    plt.figure(figsize=(8, 6))
+    plt.plot(all_time_steps, all_slip_data, '#d62728', linewidth=2.5, label='Accumulated Slip', zorder=3)
+    for i in range(1, len(cycle_boundaries)-1):
+        boundary_idx = cycle_boundaries[i] - 1
+        if boundary_idx < len(all_time_steps):
+            color = colors[(i-1) % len(colors)]
+            plt.axvline(x=all_time_steps[boundary_idx], color=color, linestyle='--', alpha=0.8, 
+                       linewidth=2, label=f'End Cycle {i-1}', zorder=2)
+    plt.xlabel('Time Steps', fontweight='bold')
+    plt.ylabel('Accumulated Slip (m)', fontweight='bold')
+    plt.title(f'Accumulated Slip at Paleoseismic Site - Time Steps\n({actual_station_pct:.1f}% Along Strike)', 
+              fontweight='bold', pad=15)
+    plt.grid(True, alpha=0.4, linestyle='-', linewidth=0.5)
+    plt.legend(frameon=True, framealpha=0.9, edgecolor='black', fancybox=False)
+    plt.gca().set_axisbelow(True)
+    plt.gca().ticklabel_format(style='scientific', axis='x', scilimits=(-3,3))
+    plt.tick_params(which='major', length=6, width=1.2)
+    plt.tight_layout()
+    steps_file = f'c.paleosite_slip_{actual_station_pct:.1f}pct_timesteps_improved.png'
+    plt.savefig(steps_file, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    print(f'Saved: {steps_file}')
+    
+    # Save data to text file with all time units
+    data_file = f'c.paleosite_slip_{actual_station_pct:.1f}pct_improved.txt'
+    with open(data_file, 'w') as f:
+        f.write(f"# Accumulated slip at paleoseismic site\n")
+        f.write(f"# Station: {actual_station_pct:.1f}% along strike, free surface (depth 100%)\n")
+        f.write(f"# Columns: Time_Step Time_Years Time_Days Time_Seconds Accumulated_Slip(m)\n")
+        for i, (t, s) in enumerate(zip(all_time_steps, all_slip_data)):
+            f.write(f"{t} {time_years[i]:.6f} {time_days[i]:.3f} {all_time_seconds[i]:.1f} {s:.6f}\n")
+    print(f'Saved data: {data_file}')
+    
+    # Save earthquake events and recurrence times to CSV file
+    csv_file = f'c.earthquake_recurrence_{actual_station_pct:.1f}pct.csv'
+    with open(csv_file, 'w') as f:
+        f.write('Event_ID,Q_Folders,Time_Years,Slip_m,Recurrence_Time_Years\n')
+        for i, (event_time, event_slip, q_range) in enumerate(zip(event_times, event_slip_values, event_q_ranges)):
+            q_start, q_end = q_range
+            if q_start == q_end:
+                q_str = f"Q{q_start}"
+            else:
+                q_str = f"Q{q_start}-Q{q_end}"
+            
+            recur_time = recurrence_times[i-1] if i > 0 and i-1 < len(recurrence_times) else ''
+            f.write(f'E{i+1},{q_str},{event_time:.6f},{event_slip:.6f},{recur_time}\n')
+        
+        # Add threshold information
+        f.write(f'\n# Parameters\n')
+        f.write(f'Slip_Threshold_m,{slip_threshold}\n')
+        
+        # Calculate statistics
+        if recurrence_times:
+            mean_recur = np.mean(recurrence_times)
+            std_recur = np.std(recurrence_times, ddof=1)  # Sample standard deviation
+            cov_recur = (std_recur / mean_recur) * 100 if mean_recur != 0 else 0
+            
+            f.write('\n# Statistics\n')
+            f.write(f'Mean,{mean_recur:.6f}\n')
+            f.write(f'Std,{std_recur:.6f}\n')
+            f.write(f'COV_percent,{cov_recur:.2f}\n')
+            f.write(f'Count,{len(recurrence_times)}\n')
+            f.write(f'Events_Detected,{len(event_times)}\n')
+            
+            print(f'\nRecurrence time statistics:')
+            print(f'  Mean: {mean_recur:.3f} years')
+            print(f'  Std:  {std_recur:.3f} years')
+            print(f'  COV:  {cov_recur:.1f}%')
+            print(f'  Count: {len(recurrence_times)} intervals')
+        else:
+            print('No recurrence times calculated (need at least 2 earthquake events)')
+    
+    print(f'Saved earthquake data: {csv_file}')
+    
+    print(f"\nGenerated files:")
+    print(f"  - {out_file} (combined 2-panel plot)")
+    print(f"  - {years_file} (years only)")
+    print(f"  - {days_file} (days only)")
+    print(f"  - {steps_file} (time steps only)")
+    print(f"  - {data_file} (data with all time units)")
+    print(f"  - {csv_file} (earthquake events and recurrence statistics)")
+
+def get_user_input():
+    """Interactive terminal interface for selecting station and cycles"""
+    print("\n=== Plot Slip at Paleoseismic Site ===")
+    print("This tool plots accumulated slip at a single station at the free surface (depth 100%)")
+    print("Useful for analyzing paleoseismic sites and long-term slip accumulation")
+    print()
+    
+    # Get station position
+    while True:
+        try:
+            pos_input = input("Station position along strike (0-100%, default=50%): ").strip()
+            if pos_input == "":
+                station_pct = 50.0
+                break
+            station_pct = float(pos_input)
+            if 0 <= station_pct <= 100:
+                break
+            print("Position must be between 0 and 100%")
+        except ValueError:
+            print("Please enter a number between 0 and 100")
+    
+    # Get number of cycles
+    while True:
+        try:
+            ncyc = int(input("Number of cycles to process: "))
+            if ncyc > 0:
+                break
+            print("Number of cycles must be positive")
+        except ValueError:
+            print("Please enter a positive integer")
+    
+    # Get time step interval
+    while True:
+        try:
+            ninterval = int(input("Time step interval (1=every step, 10=every 10th step, default=1): ") or "1")
+            if ninterval > 0:
+                break
+            print("Interval must be positive")
+        except ValueError:
+            print("Please enter a positive integer")
+    
+    # Get slip threshold for earthquake detection
+    while True:
+        try:
+            slip_input = input("Slip threshold for earthquake detection (m, default=0.1): ").strip()
+            if slip_input == "":
+                slip_threshold = 0.1
+                break
+            slip_threshold = float(slip_input)
+            if slip_threshold > 0:
+                break
+            print("Slip threshold must be positive")
+        except ValueError:
+            print("Please enter a positive number")
+    
+    return station_pct, ncyc, ninterval, slip_threshold
+
+def tryint(s):
+    try:
+        return int(s)
+    except:
+        return s
+
+def alphanum_key(s):
+    return [tryint(c) for c in re.split('([0-9]+)', s)]
+
+def sort_nicely(l):
+    l.sort(key=alphanum_key, reverse=False)
+    return l
+
+def _main_func(description):
+    
+    if len(sys.argv) == 1:
+        # Interactive mode
+        station_pct, ncyc, ninterval, slip_threshold = get_user_input()
+        plot_accumulated_slip_at_station(ncyc, station_pct, ninterval, slip_threshold)
+            
+    elif len(sys.argv) == 2 and sys.argv[1] == '-h':
+        print('plotSlipAtPaleoSite_improved - Plot accumulated slip at a paleoseismic site')
+        print()
+        print('Interactive mode (recommended):')
+        print('  plotSlipAtPaleoSite_improved')
+        print()
+        print('Command line mode:')
+        print('  plotSlipAtPaleoSite_improved [station_pct] [ncyc] [ninterval] [slip_threshold]')
+        print()
+        print('Arguments:')
+        print('  station_pct: Station position along strike (0-100%)')
+        print('  ncyc: Number of cycles to process') 
+        print('  ninterval: Time step interval (1=every step, 10=every 10th step)')
+        print('  slip_threshold: Slip threshold for earthquake detection (m, default=0.1)')
+        print()
+        print('Features:')
+        print('  - Enhanced fonts and styling for 8x6 inch figures')
+        print('  - Improved readability with larger fonts and thicker lines')
+        print('  - Better color scheme and grid styling')
+        print('  - Professional-quality plots for publications')
+        
+    elif len(sys.argv) == 4:
+        # Command line mode without slip threshold (use default)
+        try:
+            station_pct = float(sys.argv[1])
+            ncyc = int(sys.argv[2])
+            ninterval = int(sys.argv[3])
+            slip_threshold = 0.1  # Default value
+            
+            if not (0 <= station_pct <= 100):
+                print("Error: Station position must be between 0 and 100%")
+                return
+                
+            if ncyc <= 0:
+                print("Error: Number of cycles must be positive")
+                return
+                
+            if ninterval <= 0:
+                print("Error: Time interval must be positive")
+                return
+                
+            plot_accumulated_slip_at_station(ncyc, station_pct, ninterval, slip_threshold)
+            
+        except ValueError:
+            print("Error: Invalid arguments. Use -h for help.")
+            
+    elif len(sys.argv) == 5:
+        # Command line mode with slip threshold
+        try:
+            station_pct = float(sys.argv[1])
+            ncyc = int(sys.argv[2])
+            ninterval = int(sys.argv[3])
+            slip_threshold = float(sys.argv[4])
+            
+            if not (0 <= station_pct <= 100):
+                print("Error: Station position must be between 0 and 100%")
+                return
+                
+            if ncyc <= 0:
+                print("Error: Number of cycles must be positive")
+                return
+                
+            if ninterval <= 0:
+                print("Error: Time interval must be positive")
+                return
+                
+            if slip_threshold <= 0:
+                print("Error: Slip threshold must be positive")
+                return
+                
+            plot_accumulated_slip_at_station(ncyc, station_pct, ninterval, slip_threshold)
+            
+        except ValueError:
+            print("Error: Invalid arguments. Use -h for help.")
+    else:
+        print('Invalid arguments. Use -h for help or run without arguments for interactive mode.')
+    
+if __name__ == "__main__":
+    _main_func(__doc__)

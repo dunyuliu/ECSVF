@@ -1,0 +1,151 @@
+================================================================================
+COMPREHENSIVE STL PROCESSING SCENARIOS SUMMARY
+================================================================================
+Date: August 4, 2024
+Resolution: 2.0 km for all scenarios
+Downdip Extension: Modified to strike along y=0 as requested
+
+================================================================================
+SCENARIOS PROCESSED:
+================================================================================
+
+1. NO_DIP_CHANGE_1KM.STL - BASIC PROCESSING
+   Folder: no_dip_change_1km.res2km/
+   - No smoothing, no vertical transition
+   - Strike angle: 36.89°
+   - Grid size: 351 x 26 = 9,126 points
+   - Y range: -25.7 to 15.2 km
+   - Smoothness preservation: GOOD (ratio: 1.482)
+   - bFault_Rough_Geometry.txt: ✓ Generated
+
+2. VARIABLE_DIP_SIMPLER_GEOM1KM_HWS.STL - BASIC PROCESSING
+   Folder: variable_dip_simpler_geom1km_hws.res2km/
+   - No smoothing, no vertical transition
+   - Strike angle: 36.64°
+   - Grid size: 351 x 26 = 9,126 points
+   - Y range: -22.0 to 14.4 km
+   - Smoothness preservation: GOOD (ratio: 1.488)
+   - bFault_Rough_Geometry.txt: ✓ Generated
+
+3. NO_DIP_CHANGE_1KM.STL - GAUSSIAN SMOOTHING
+   Folder: no_dip_change_1km.res2km.smooth_gaussian.sigma1/
+   - Gaussian smoothing (sigma=1.0, preserve_boundaries=True)
+   - Strike angle: 36.89°
+   - Grid size: 351 x 26 = 9,126 points
+   - Y range: -25.7 to 15.2 km
+   - Smoothness preservation: POOR (ratio: 2.682)
+   - Smoothing factor: 1.002 (minimal smoothing effect)
+   - bFault_Rough_Geometry.txt: ✓ Generated
+
+4. NO_DIP_CHANGE_1KM.STL - VERTICAL TRANSITION
+   Folder: no_dip_change_1km.res2km.vertical_transition.start_auto.dist5km.best_fit_line/
+   - Vertical transition enabled (auto start at -25km, 5km distance)
+   - Target plane: best_fit_line method
+   - Strike angle: 36.89°
+   - Grid size: 351 x 26 = 9,126 points
+   - Y range: -25.7 to 15.2 km
+   - Transition affects: 1,053 points (11.5%)
+   - Max Y change: 3.764 km, RMS: 1.534 km
+   - Target plane: y = 0.004744*x + -2.104
+   - Smoothness preservation: POOR (ratio: 2.457)
+   - bFault_Rough_Geometry.txt: ✓ Generated
+
+5. VARIABLE_DIP - COMBINED SMOOTHING + VERTICAL TRANSITION
+   Folder: variable_dip_simpler_geom1km_hws.res2km.smooth_gaussian.sigma1.5.vertical_transition.start_auto.dist3km.strike_aligned/
+   - Gaussian smoothing (sigma=1.5) + vertical transition
+   - Transition: strike_aligned method, 3km distance
+   - Strike angle: 36.64°
+   - Grid size: 351 x 26 = 9,126 points
+   - Y range: -22.0 to 14.4 km
+   - Smoothing factor: 1.005
+   - Transition affects: 702 points (7.7%)
+   - Max Y change: 2.374 km, RMS: 1.073 km
+   - Target plane: Strike-aligned vertical plane (strike=0.1°)
+   - Smoothness preservation: POOR (ratio: 2.701)
+   - bFault_Rough_Geometry.txt: ✓ Generated
+
+6. NO_DIP_CHANGE_1KM.STL - ADAPTIVE SMOOTHING
+   Folder: no_dip_change_1km.res2km.smooth_adaptive.rough0.1/
+   - Adaptive smoothing (target roughness=0.1, max_iterations=5)
+   - Target achieved in 1 iteration
+   - Strike angle: 36.89°
+   - Grid size: 351 x 26 = 9,126 points
+   - Y range: -25.7 to 15.2 km
+   - Final roughness: 0.032 (well below target of 0.1)
+   - Smoothness preservation: GOOD (ratio: 1.482)
+   - bFault_Rough_Geometry.txt: ✓ Generated
+
+================================================================================
+KEY MODIFICATIONS IMPLEMENTED:
+================================================================================
+
+1. DOWNDIP EXTENSION MODIFICATION:
+   - Changed downdip extension to strike along y=0 as requested
+   - All points in the extension zone (below STL data) now have y=0
+   - This ensures consistent strike direction in the deeper regions
+
+2. ORGANIZED OUTPUT STRUCTURE:
+   - Each scenario creates a descriptive folder name
+   - All outputs (Geometry.txt, plots, reports) organized in individual folders
+   - bFault_Rough_Geometry.txt automatically created in each folder
+
+3. COMPREHENSIVE ANALYSIS:
+   - Original STL smoothness analysis
+   - Processed mesh smoothness analysis
+   - Smoothness preservation verification
+   - Detailed processing reports and visualizations
+
+================================================================================
+OUTPUT FILES STRUCTURE (for each scenario):
+================================================================================
+
+Each folder contains:
+- {scenario}_Geometry.txt         - Main EQQuasi input file
+- bFault_Rough_Geometry.txt       - Copy of Geometry.txt for convenience
+- {scenario}_grid.csv             - Tabular data
+- {scenario}_grid.npz             - NumPy arrays + metadata
+- {scenario}_summary.txt          - Processing summary
+- {scenario}_smoothness_report.txt - Detailed smoothness analysis
+- Various .png visualization files - Processing and analysis plots
+
+================================================================================
+TECHNICAL SPECIFICATIONS:
+================================================================================
+
+Grid Configuration:
+- Resolution: 2.0 km
+- X range: -350 to 350 km (351 points)
+- Z range: 0 to -50 km (26 levels)
+- Total grid points: 9,126 per scenario
+
+STL Processing:
+- Automatic strike angle calculation and rotation
+- Recentering to (0,0,0) at top center
+- STL interpolation zone: 0 to -20 km (original STL depth)
+- Extension zone: -22 to -50 km (vertical extension with y=0)
+
+File Formats:
+- Geometry.txt format: nx nz 0 / resolution min_x min_z / y(m) dy/dx dy/dz
+- All y-coordinates converted from km to meters in output
+- Derivatives calculated using central differences
+
+================================================================================
+USAGE EXAMPLES FOR GENERATED FILES:
+================================================================================
+
+To use any bFault_Rough_Geometry.txt file with EQQuasi:
+1. Copy the desired bFault_Rough_Geometry.txt to your EQQuasi working directory
+2. Update your EQQuasi input files to reference this geometry
+3. The file format is ready for direct use with EQQuasi
+
+File locations:
+./no_dip_change_1km.res2km/bFault_Rough_Geometry.txt
+./variable_dip_simpler_geom1km_hws.res2km/bFault_Rough_Geometry.txt
+./no_dip_change_1km.res2km.smooth_gaussian.sigma1/bFault_Rough_Geometry.txt
+./no_dip_change_1km.res2km.vertical_transition.start_auto.dist5km.best_fit_line/bFault_Rough_Geometry.txt
+./variable_dip_simpler_geom1km_hws.res2km.smooth_gaussian.sigma1.5.vertical_transition.start_auto.dist3km.strike_aligned/bFault_Rough_Geometry.txt
+./no_dip_change_1km.res2km.smooth_adaptive.rough0.1/bFault_Rough_Geometry.txt
+
+================================================================================
+END OF SUMMARY
+================================================================================

@@ -1,0 +1,27 @@
+AGENTS.md
+CLAUDE.md
+archive/
+.DS_Store
+**/.DS_Store
+**/__pycache__/
+*.py[cod]
+.claude/
+**/.claude/
+benchmark/.mplconfig/
+*.zip
+
+# Full simulation archives stay local-only.
+results/*
+!results/README.md
+!results/postprocess.sh
+!results/plot.all.source.dynamics.py
+!results/plot.rupture.length.vs.time.py
+!results/plotAccumulated
+!results/plotOnFaultVars
+!results/plotSlipAtPaleoSite
+!results/post.process.eq.stats.py
+!results/sync_models.py
+
+# Large external benchmark files are documented but not tracked in the release repo.
+benchmark/Simulation_results/
+benchmark/analytics/

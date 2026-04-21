@@ -1,0 +1,263 @@
+#! /usr/bin/env python3
+"""
+Script to plot on fault variables with improved visuals and parallel processing.
+Usage: python plotOnFaultVars_mod [--cores N]
+"""
+
+import xarray as xr
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+import numpy as np
+import os, glob, re, imageio
+import sys
+import multiprocessing as mp
+from functools import partial
+from pdf2image import convert_from_path
+from user_defined_params import par
+
+# Improved visual settings for better hierarchy
+TICK_SIZE = 10      # For axis tick labels
+LABEL_SIZE = 12     # For axis labels (xlabel, ylabel)
+SUBTITLE_SIZE = 14  # For subplot titles
+TITLE_SIZE = 20     # For main figure title
+
+r = 10e6 # half range to show stresses in Pa.
+mn = par.init_norm # initial normal stress
+ms = -mn*par.fric_rsf_r0 # initial mean shear stress for plotting.
+md = 0 # initial mean shear dip stress
+
+# Consistent colormaps - use same colormap for top three and middle plot
+STRESS_CMAP = 'RdBu_r'  # For Pa units: shear_strike, shear_dip, norm, state_normal
+RATE_CMAP = 'plasma'    # For slip_rate and state variables
+
+def plot_fault(fname, global_data=None):
+    """Plot fault variables with consistent styling and time information"""
+    try:
+        a = xr.open_dataset(fname)
+        shear_strike = a.shear_strike
+        shear_dip    = a.shear_dip
+        norm         = a.effective_normal
+        slip_rate    = a.slip_rate + 1e-30
+        state        = a.state_variable 
+        state2       = a.state_normal
+
+        # Load global data if not provided
+        if global_data is None:
+            b = np.loadtxt('global.dat')
+        else:
+            b = global_data
+            
+        cumulativeTime = b[:,0]
+        secondToYearConst = 365*24*60*60
+        cumulativeTimeInYears = cumulativeTime/secondToYearConst
+
+        nstep = int(''.join(filter(str.isdigit,fname)))
+        time_years = cumulativeTimeInYears[nstep-1] if nstep <= len(cumulativeTimeInYears) else 0
+
+        fig1 = plt.figure(figsize=(18,12))
+        plt.rcParams.update({
+            'font.size': TICK_SIZE,
+            'axes.titlesize': SUBTITLE_SIZE,
+            'axes.labelsize': LABEL_SIZE,
+            'xtick.labelsize': TICK_SIZE,
+            'ytick.labelsize': TICK_SIZE,
+            'font.weight': 'bold'  # Make tick labels bold
+        })
+
+        # Main title with time information
+        fig1.suptitle(f'{fname} - Time: {time_years:.3f} years', 
+                      fontsize=TITLE_SIZE, fontweight='bold', y=0.95)
+
+        # Stress variables (Pa units) - same colormap
+        ax11 = fig1.add_subplot(3,3,1)
+        shear_strike.plot(ax=ax11, vmin=ms-r, vmax=ms+r, extend='both', cmap=STRESS_CMAP)
+        ax11.set_xlabel(''), ax11.set_ylabel('Along-dip (km)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax11.set_title('Shear Strike (Pa)', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        ax12 = fig1.add_subplot(3,3,2)
+        shear_dip.plot(ax=ax12, vmin=md-r, vmax=md+r, extend='both', cmap=STRESS_CMAP)
+        ax12.set_xlabel(''), ax12.set_ylabel('')
+        ax12.set_title('Shear Dip (Pa)', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        ax13 = fig1.add_subplot(3,3,3)
+        norm.plot(ax=ax13, vmin=mn-r, vmax=mn+r, extend='both', cmap=STRESS_CMAP)
+        ax13.set_xlabel(''), ax13.set_ylabel('')
+        ax13.set_title('Normal Stress (Pa)', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        # Slip rate and state variables
+        ax21 = fig1.add_subplot(3,3,4)
+        log10_slip_rate = np.log10(slip_rate)
+        log10_slip_rate.plot(ax=ax21, vmin=-20, vmax=2, extend='both', cmap=RATE_CMAP)
+        ax21.set_xlabel('Along-strike (km)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax21.set_ylabel('Along-dip (km)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax21.set_title('Log₁₀(Slip Rate)', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        ax22 = fig1.add_subplot(3,3,5)
+        state2.plot(ax=ax22, vmin=-mn-r, vmax=-mn+r, extend='both', cmap=STRESS_CMAP)
+        ax22.set_xlabel('Along-strike (km)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax22.set_ylabel('')
+        ax22.set_title('State Normal (Pa)', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        ax23 = fig1.add_subplot(3,3,6)
+        log10_state = np.log10(state)
+        log10_state.plot(ax=ax23, vmin=0, vmax=10, extend='both', cmap=RATE_CMAP)
+        ax23.set_xlabel('Along-strike (km)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax23.set_ylabel('')
+        ax23.set_title('Log₁₀(State Variable)', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        # Time series plots
+        ax31 = fig1.add_subplot(3,3,7)
+        ax31.plot(b[:,1], 'b-', linewidth=2)
+        ax31.plot(nstep-1,b[nstep-1,1],'ro',markersize=10)
+        ax31.set_xlabel('Time Steps', fontsize=LABEL_SIZE, fontweight='bold')
+        ax31.set_ylabel('Peak Slip Rate (m/s)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax31.set_title('Peak Slip Rate Evolution', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        ax32 = fig1.add_subplot(3,3,8)
+        ax32.plot(np.log10(b[:,1]), 'g-', linewidth=2)
+        ax32.plot(nstep-1,np.log10(b[nstep-1,1]),'ro',markersize=10)
+        ax32.set_xlabel('Time Steps', fontsize=LABEL_SIZE, fontweight='bold')
+        ax32.set_ylabel('Log₁₀(Peak Slip Rate)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax32.set_title('Log₁₀(Peak Slip Rate)', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        ax33 = fig1.add_subplot(3,3,9)
+        ax33.plot(cumulativeTimeInYears, np.log10(b[:,1]), 'r-', linewidth=2)
+        ax33.plot(cumulativeTimeInYears[nstep-1],np.log10(b[nstep-1,1]),'ro',markersize=10)
+        ax33.set_xlabel('Time (Years)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax33.set_ylabel('Log₁₀(Peak Slip Rate)', fontsize=LABEL_SIZE, fontweight='bold')
+        ax33.set_title('Time Series (Years)', fontsize=SUBTITLE_SIZE, fontweight='bold')
+
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.9)
+        plt.savefig(fname + ".png", dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        
+        return fname + ".png"
+    except Exception as e:
+        print(f"Error processing {fname}: {e}")
+        return None
+
+def plot_roughness(fname):
+    a = xr.open_dataset(fname)
+    b1 = a.peak
+    b2 = a.pypx
+    b3 = a.pypz
+
+    fig1 = plt.figure(figsize=(8,6))
+    plt.rc('font', size=TICK_SIZE)
+
+    ax11 = fig1.add_subplot(2,2,1)
+    b1.plot(ax=ax11)
+    ax11.set_xlabel('')
+
+    ax12 = fig1.add_subplot(2,2,2)
+    b2.plot(ax=ax12)
+    ax12.set_xlabel(''), ax12.set_ylabel('')
+
+    ax21 = fig1.add_subplot(2,2,3)
+    b3.plot(ax=ax21)
+
+    plt.savefig(fname + ".png", dpi=600)
+    plt.close()
+
+    return (fig1,)
+
+def tryint(s):
+    try:
+        return int(s)
+    except:
+        return s
+
+def alphanum_key(s):
+    return [tryint(c) for c in re.split('([0-9]+)', s)]
+
+def sort_nicely(l):
+    l.sort(key=alphanum_key, reverse=False)
+    return l
+
+def generate_gif():
+    filenames = glob.glob('./fault.*.png')
+    filenames = sort_nicely(filenames)
+    with imageio.get_writer('./on_fault_vars.gif', mode='I', duration=0.3) as writer:
+        for filename in filenames:
+            image = imageio.v2.imread(filename)
+            writer.append_data(image)
+
+def seek_numbers_filename(x):
+    return (x[6:10])
+
+def process_fault_file_wrapper(args):
+    """Wrapper for parallel processing"""
+    fname, global_data = args
+    if not os.path.exists(fname + '.png'):
+        return plot_fault(fname, global_data)
+    return fname + ".png"
+
+def get_num_cores():
+    """Get number of cores from command line argument"""
+    cores = 1
+    if len(sys.argv) > 1:
+        for i, arg in enumerate(sys.argv):
+            if arg == '--cores' and i + 1 < len(sys.argv):
+                try:
+                    cores = int(sys.argv[i + 1])
+                    cores = max(1, min(cores, mp.cpu_count()))
+                except ValueError:
+                    cores = 1
+    return cores
+
+def _main_func(description):
+    """Main processing function with optional parallel processing"""
+    cores = get_num_cores()
+    print(f"Processing with {cores} core(s)")
+    
+    # Load global data once for all processes
+    try:
+        global_data = np.loadtxt('global.dat')
+    except:
+        global_data = None
+        print("Warning: Could not load global.dat")
+    
+    # Find fault files
+    fault_files = []
+    roughness_files = []
+    
+    for fname in os.listdir(os.getcwd()):
+        name, file_extension = os.path.splitext(fname)
+        if 'fault.' in name and '.nc' in file_extension and re.search(r'\.\d+',name):
+            fault_files.append(fname)
+        elif 'roughness' in name and '.nc' in file_extension:
+            roughness_files.append(fname)
+    
+    fault_files = sort_nicely(fault_files)
+    print(f"Found {len(fault_files)} fault files")
+    
+    # Process fault files
+    if cores > 1 and len(fault_files) > 1:
+        print(f"Processing fault files in parallel with {cores} cores")
+        # Prepare arguments for parallel processing
+        args_list = [(fname, global_data) for fname in fault_files]
+        
+        with mp.Pool(cores) as pool:
+            results = pool.map(process_fault_file_wrapper, args_list)
+        
+        successful = [r for r in results if r is not None]
+        print(f"Successfully processed {len(successful)}/{len(fault_files)} fault files")
+    else:
+        print("Processing fault files sequentially")
+        for fname in fault_files:
+            if not os.path.exists(fname + '.png'):
+                plot_fault(fname, global_data)
+    
+    # Process roughness files (usually fewer, so sequential is fine)
+    for fname in roughness_files:
+        plot_roughness(fname)
+    
+    # Generate GIF
+    print("Generating GIF animation...")
+    generate_gif()
+    print("Processing complete!")
+
+if __name__ == "__main__":
+    _main_func(__doc__)

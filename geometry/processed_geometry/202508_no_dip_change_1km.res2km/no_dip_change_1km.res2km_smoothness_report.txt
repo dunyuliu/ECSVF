@@ -1,0 +1,83 @@
+================================================================================
+FAULT SURFACE SMOOTHNESS ANALYSIS REPORT
+================================================================================
+
+STL File: no_dip_change_1km.stl
+Processing Date: 2025-08-05 13:31:13
+Grid Resolution: 2.0 km
+Grid Dimensions: 381 x 26
+Total Points: 9906
+
+ORIGINAL STL SMOOTHNESS METRICS:
+----------------------------------------
+Planar Deviation Metrics:
+  RMS Deviation: 4.865277 km
+  Max Deviation: 21.666972 km
+  Mean Abs Deviation: 3.754541 km
+  Standard Deviation: 4.865277 km
+  Deviation Range: 37.400684 km
+
+Surface Roughness Metrics:
+  RMS Roughness: 0.011903 km
+  Mean Local Roughness: 0.004327 km
+  Max Local Roughness: 0.197370 km
+  Neighborhood Size: 5
+
+Overall Smoothness Score: 4.877181
+
+PROCESSED MESH SMOOTHNESS METRICS:
+----------------------------------------
+Planar Deviation Metrics:
+  RMS Deviation: 4.999869 km
+  Max Deviation: 16.904316 km
+  Mean Abs Deviation: 3.698814 km
+  Standard Deviation: 4.999869 km
+  Deviation Range: 33.602197 km
+
+Surface Roughness Metrics:
+  RMS Roughness: 0.097174 km
+  Mean Local Roughness: 0.027842 km
+  Max Local Roughness: 1.709541 km
+  Neighborhood Size: 5
+
+Overall Smoothness Score: 5.097043
+
+SMOOTHNESS PRESERVATION ANALYSIS:
+----------------------------------------
+Preservation Ratios (Processed/Original):
+  RMS Deviation Ratio: 1.028
+  Max Deviation Ratio: 0.780
+  Roughness Ratio: 8.164
+  Smoothness Score Ratio: 1.045
+
+Average Preservation Ratio: 2.754
+Preservation Quality: POOR
+
+Summary:
+  Score Change: 0.219862
+  Relative Change: 4.51%
+
+REFERENCE PLANE INFORMATION:
+----------------------------------------
+Original STL Reference Plane:
+  Method: best_fit_plane
+  Equation: 0.282727x + -0.369987y + 0.884972z = -1538.997645
+  Normal Vector: [0.282727, -0.369987, 0.884972]
+  Centroid: [1401.559, 5206.699, -9.996] km
+
+INTERPRETATION GUIDE:
+----------------------------------------
+Preservation Ratios:
+  < 1.2: Excellent preservation
+  1.2-1.5: Good preservation
+  1.5-2.0: Moderate preservation
+  > 2.0: Poor preservation
+
+Smoothness Scores:
+  Lower values indicate smoother surfaces
+  Scores combine planar deviation + surface roughness + curvature
+
+Surface Roughness:
+  Measured using local neighborhood analysis
+  RMS roughness provides overall surface texture measure
+

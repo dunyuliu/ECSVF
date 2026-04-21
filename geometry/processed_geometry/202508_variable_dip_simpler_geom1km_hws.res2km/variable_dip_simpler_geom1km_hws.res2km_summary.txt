@@ -1,0 +1,43 @@
+================================================================================
+STL TO FAULT GRID PROCESSING SUMMARY
+================================================================================
+
+Processing Date: 2025-08-05 13:27:05
+STL File: variable_dip_simpler_geom1km_hws.stl
+Output Folder: /Users/dliu/scratch/alpine/variable_dip_simpler_geom1km_hws.res2km
+
+BASIC PROCESSING PARAMETERS:
+----------------------------------------
+Grid Resolution: 2.0 km
+Grid Dimensions: 381 x 26
+X Range: -380 to 380 km
+Z Range: 0 to -50 km
+Total Points: 9906
+Original Strike Angle: 36.64°
+
+SMOOTHING CONTROL:
+----------------------------------------
+Method: none
+
+VERTICAL TRANSITION:
+----------------------------------------
+Enabled: False
+
+SMOOTHNESS ANALYSIS:
+----------------------------------------
+Original Smoothness Score: 5.111437
+Processed Smoothness Score: 4.695585
+Average Preservation Ratio: 2.398
+Preservation Quality: POOR
+
+OUTPUT FILES:
+----------------------------------------
+• variable_dip_simpler_geom1km_hws.res2km_Geometry.txt (main output for EQQuasi)
+• variable_dip_simpler_geom1km_hws.res2km_grid.csv (tabular data)
+• variable_dip_simpler_geom1km_hws.res2km_grid.npz (numpy arrays)
+• variable_dip_simpler_geom1km_hws.res2km_smoothness_report.txt (detailed smoothness analysis)
+• variable_dip_simpler_geom1km_hws.res2km_processing.png (processing visualization)
+• variable_dip_simpler_geom1km_hws.res2km_smoothness_analysis.png (original STL smoothness)
+• variable_dip_simpler_geom1km_hws.res2km_processed_smoothness_analysis.png (processed mesh smoothness)
+• variable_dip_simpler_geom1km_hws.res2km_smoothness_comparison.png (preservation comparison)
+• variable_dip_simpler_geom1km_hws.res2km_summary.txt (this file)
