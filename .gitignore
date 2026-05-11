@@ -25,3 +25,4 @@ results/*
 # Large external benchmark files are documented but not tracked in the release repo.
 benchmark/Simulation_results/
 benchmark/analytics/
+paper/

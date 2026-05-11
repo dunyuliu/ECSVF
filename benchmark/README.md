@@ -25,10 +25,10 @@ That PDF currently states:
 - `utils/process.pyrsqsim.py`: export the sibling `PyRSQSim.dev/examples/alpine` run directly from its STL, catalog, and history files.
 - `utils/verify.eqquasi.geometry.conversion.py`: verify geometry back-transform, surface-site mapping, site slips, and event summary values by recomputing them from the raw `Q*` outputs.
 - `utils/benchmark.comparison.analytics.py`: compare every complete bundle found under `Simulation_results/*_results`.
-- `utils/plot.accumulated.slip.eqquasi.py`: standalone script that produces three publication-quality figures for a single `EQquasi` case — individual earthquake slip profiles (colored by time), running accumulated coseismic slip, and long-term slip rate vs. along-strike distance. Reads `fault.r.nc` from each `Q*` folder at 88% depth; applies the 0.5 m slip threshold. Accepts `--case-dir` and optional `--outdir`.
-- `/Users/dliu/scratch/alpine/process.eqquasi.sh`: shared shell wrapper for rebuilding the `EQquasi` benchmark bundles.
-- `/Users/dliu/scratch/alpine/process.pyrsqsim.sh`: shared shell wrapper for rebuilding the `PyRSQSim` Alpine example bundle.
-- `/Users/dliu/scratch/alpine/run.comparison.sh`: shared shell runner for rebuilding benchmark bundles and analytics together.
+- `utils/plot.accumulated.slip.eqquasi.py`: standalone script that produces three publication-quality figures for a single `EQquasi` case — individual earthquake slip profiles (colored by time), running accumulated slip, and long-term slip rate vs. along-strike distance. Reads `fault.r.nc` from each `Q*` folder at 88% depth; applies the 0.5 m slip threshold. Accepts `--case-dir` and optional `--outdir`.
+- `process.eqquasi.sh`: shared shell wrapper for rebuilding the `EQquasi` benchmark bundles.
+- `process.pyrsqsim.sh`: shared shell wrapper for rebuilding the `PyRSQSim` Alpine example bundle.
+- `run.comparison.sh`: shared shell runner for rebuilding benchmark bundles and analytics together.
 
 Each complete bundle must contain exactly four CSVs:
 
@@ -43,7 +43,7 @@ If any required file is missing, the scripts stop instead of skipping it.
 
 The `PyRSQSim` converter works directly from the sibling example run:
 
-- `/Users/dliu/scratch/PyRSQSim.dev/examples/alpine`
+- `${PROJECT_ROOT}/../PyRSQSim.dev/examples/alpine`
 
 It reads:
 
@@ -57,7 +57,7 @@ and reconstructs each event from the saved history arrays without any mesh-coord
 Example:
 
 ```bash
-bash /Users/dliu/scratch/alpine/process.pyrsqsim.sh
+bash ${PROJECT_ROOT}/process.pyrsqsim.sh
 ```
 
 The shared shell wrapper writes to:
@@ -97,10 +97,10 @@ Case naming for this benchmark layer:
 Planar example:
 
 ```bash
-python /Users/dliu/scratch/alpine/benchmark/utils/process.eqquasi.py \
-  --input-dir /Users/dliu/scratch/alpine/results/nz.bp5.qdc.dip50.2000.norm_6mm_yr \
-  --geometry-npz /Users/dliu/scratch/alpine/geometry/processed_geometry/202603_alpine_planar_dip50_case.res2km/alpine_planar_dip50_case.res2km_grid.npz \
-  --output-dir /Users/dliu/scratch/alpine/benchmark/Simulation_results/EQquasi_results \
+python ${PROJECT_ROOT}/benchmark/utils/process.eqquasi.py \
+  --input-dir ${PROJECT_ROOT}/results/nz.bp5.qdc.dip50.2000.norm_6mm_yr \
+  --geometry-npz ${PROJECT_ROOT}/geometry/processed_geometry/202603_alpine_planar_dip50_case.res2km/alpine_planar_dip50_case.res2km_grid.npz \
+  --output-dir ${PROJECT_ROOT}/benchmark/Simulation_results/EQquasi_results \
   --prefix alpine_planar \
   --slip-rate-threshold 0.1
 ```
@@ -115,9 +115,9 @@ This writes:
 No-dip-change example:
 
 ```bash
-python /Users/dliu/scratch/alpine/benchmark/utils/process.eqquasi.py \
-  --input-dir /Users/dliu/scratch/alpine/results/nz.bp5.qdc.noDipChange.2000.norm_6mm_yr.slowInitialLoad \
-  --output-dir /Users/dliu/scratch/alpine/benchmark/Simulation_results/EQquasi_results \
+python ${PROJECT_ROOT}/benchmark/utils/process.eqquasi.py \
+  --input-dir ${PROJECT_ROOT}/results/nz.bp5.qdc.noDipChange.2000.norm_6mm_yr.slowInitialLoad \
+  --output-dir ${PROJECT_ROOT}/benchmark/Simulation_results/EQquasi_results \
   --slip-rate-threshold 0.1
 ```
 
@@ -131,9 +131,9 @@ This writes:
 Variable-dip example:
 
 ```bash
-python /Users/dliu/scratch/alpine/benchmark/utils/process.eqquasi.py \
-  --input-dir /Users/dliu/scratch/alpine/results/nz.bp5.qdc.varyDip20251202.2000.norm_6mm_yr.slowInitialLoad \
-  --output-dir /Users/dliu/scratch/alpine/benchmark/Simulation_results/EQquasi_results \
+python ${PROJECT_ROOT}/benchmark/utils/process.eqquasi.py \
+  --input-dir ${PROJECT_ROOT}/results/nz.bp5.qdc.varyDip20251202.2000.norm_6mm_yr.slowInitialLoad \
+  --output-dir ${PROJECT_ROOT}/benchmark/Simulation_results/EQquasi_results \
   --slip-rate-threshold 0.1
 ```
 
@@ -151,7 +151,7 @@ Defaults in the exporter:
 - File 1 threshold: `Mw > 7.0`
 - rupture area threshold: `slip > 0.0 m`
 - rupture bound threshold: `slip > 0.5 m` (overrides draft `0.1 m` to suppress noise fragments)
-- site inclusion threshold: `slip > 0.0 m` on the mapped closest patch
+- site inclusion threshold: `slip > 0.5 m` on the mapped closest patch (set in `process.eqquasi.sh`; suppresses events where the rupture barely grazed the site)
 - rupture bound algorithm: largest contiguous along-strike segment above threshold, bounds taken from the surface row of the fault mesh
 
 The exporter and verifier only support the direct draft-compliant workflow. They do not substitute proxy hypocentres or hidden alternate paths. If a future case lacks an in-window dynamic snapshot for a File 1 event, the exporter will stop with an error.
@@ -159,9 +159,9 @@ The exporter and verifier only support the direct draft-compliant workflow. They
 ## Verify Export
 
 ```bash
-python /Users/dliu/scratch/alpine/benchmark/utils/verify.eqquasi.geometry.conversion.py \
-  --case-dir /Users/dliu/scratch/alpine/results/nz.bp5.qdc.noDipChange.2000.norm_6mm_yr.slowInitialLoad \
-  --export-dir /Users/dliu/scratch/alpine/benchmark/Simulation_results/EQquasi_results \
+python ${PROJECT_ROOT}/benchmark/utils/verify.eqquasi.geometry.conversion.py \
+  --case-dir ${PROJECT_ROOT}/results/nz.bp5.qdc.noDipChange.2000.norm_6mm_yr.slowInitialLoad \
+  --export-dir ${PROJECT_ROOT}/benchmark/Simulation_results/EQquasi_results \
   --prefix alpine_no_dip_change \
   --slip-rate-threshold 0.1
   # --rupture-bound-slip-threshold defaults to 0.5 (matches process.eqquasi.py)
@@ -182,9 +182,9 @@ The verifier infers the processed geometry and output prefix from `--case-dir` u
 ## Compare Bundles
 
 ```bash
-python /Users/dliu/scratch/alpine/benchmark/utils/benchmark.comparison.analytics.py \
-  --simulation-root /Users/dliu/scratch/alpine/benchmark/Simulation_results \
-  --outdir /Users/dliu/scratch/alpine/benchmark/analytics
+python ${PROJECT_ROOT}/benchmark/utils/benchmark.comparison.analytics.py \
+  --simulation-root ${PROJECT_ROOT}/benchmark/Simulation_results \
+  --outdir ${PROJECT_ROOT}/benchmark/analytics
 ```
 
 The analytics script scans all complete bundles under `Simulation_results/*_results`, writes:
@@ -192,11 +192,14 @@ The analytics script scans all complete bundles under `Simulation_results/*_resu
 - `analytics/bundle_summary.csv`
 - `analytics/pairwise_event_comparison.csv`
 - `analytics/pairwise_site_comparison.csv`
-- `analytics/event_mw_histogram.png`
-- `analytics/recurrence_cdf.png`
-- `analytics/site1_slip_cdf.png`
-- `analytics/site2_slip_cdf.png`
-- `analytics/site3_slip_cdf.png`
+- `analytics/mw_histogram.png` — event Mw relative-frequency distribution per bundle
+- `analytics/mw_frequency.png` — magnitude-frequency distribution (raw counts, log y-axis)
+- `analytics/gutenberg_richter.png` — cumulative N(Mw ≥ M) per bundle (log y-axis)
+- `analytics/recurrence_histogram.png` — recurrence interval relative-frequency distribution
+- `analytics/site1_slip_histogram.png`
+- `analytics/site2_slip_histogram.png`
+- `analytics/site3_slip_histogram.png`
+- `analytics/slip_accumulated_along_strike.png` — accumulated slip vs. along-strike northing, first 3000 yr; EQquasi uses actual `fault.r.nc` profiles, all other codes use `0.5 × max_slip_m` over the rupture extent
 - `analytics/rupture_extents.png` — time vs. along-strike northing for all models, 3000-yr window, one varying-dip bundle per source
 - `analytics/long_term_slip_rate.png` — slip rate vs. along-strike northing for all bundles; EQquasi uses actual `fault.r.nc` slip profiles (via `plot.accumulated.slip.eqquasi` functions), all other codes use `0.5 × max_slip_m` distributed uniformly over the rupture extent
 
@@ -208,11 +211,11 @@ Pairwise CSV rows are only produced when two bundles share the same benchmark sc
 
 The shared shell workflow is:
 
-- [process.eqquasi.sh](/Users/dliu/scratch/alpine/process.eqquasi.sh): rebuild `EQquasi_results`
-- [process.pyrsqsim.sh](/Users/dliu/scratch/alpine/process.pyrsqsim.sh): rebuild `PyRSQSim_results`
-- [run.comparison.sh](/Users/dliu/scratch/alpine/run.comparison.sh): run both processors, then rebuild `benchmark/analytics`
+- [process.eqquasi.sh](${PROJECT_ROOT}/process.eqquasi.sh): rebuild `EQquasi_results`
+- [process.pyrsqsim.sh](${PROJECT_ROOT}/process.pyrsqsim.sh): rebuild `PyRSQSim_results`
+- [run.comparison.sh](${PROJECT_ROOT}/run.comparison.sh): run both processors, then rebuild `benchmark/analytics`
 
-[run.comparison.sh](/Users/dliu/scratch/alpine/run.comparison.sh) executes the full benchmark workflow:
+[run.comparison.sh](${PROJECT_ROOT}/run.comparison.sh) executes the full benchmark workflow:
 
 - export `alpine_planar`
 - verify `alpine_planar`
@@ -226,7 +229,7 @@ The shared shell workflow is:
 Run it from the project root with:
 
 ```bash
-bash /Users/dliu/scratch/alpine/run.comparison.sh
+bash ${PROJECT_ROOT}/run.comparison.sh
 ```
 
 At the moment this means:
@@ -254,8 +257,8 @@ Current benchmark bundle inventory:
   - `alpine_varying_dip_*`
 - `Simulation_results/HBI_results`
   - STL geometry files and a PPTX
-  - `alpine_varying_dip_*` bundle (variable backslip run)
-  - note: `m0_Nm`, `area_m2`, and `dt_s` columns are `nan` in the event file — HBI does not provide them
+  - six `alpine_hbi_{jobid}_{scenario}_*` bundles generated by `process.hbi.py`
+  - note: `m0_Nm`, `area_m2`, and `dt_s` columns are `nan` — HBI does not provide them
 - `Simulation_results/PyRSQSim_results`
   - rebuilt from the sibling `PyRSQSim.dev/examples/alpine` workflow
   - current shared shell wrapper exports `alpine_varying_dip_5km_*` using the explicit `onset_centroid` hypocentre policy
@@ -267,7 +270,7 @@ Current benchmark bundle inventory:
 
 ## Third-Party Bundle Format Notes
 
-MCQsim and HBI deliver results in formats that differ from the benchmark standard and required normalization on import. These fixes are applied once when unzipping and are not re-applied by any automated script.
+MCQsim and HBI deliver results in formats that differ from the benchmark standard and required normalization on import. For HBI, `utils/process.hbi.py` now handles conversion automatically (run via `run.comparison.sh`). MCQsim still requires manual normalization on import.
 
 ### MCQsim
 
@@ -281,8 +284,8 @@ Source zip: `MCQsim_results-*.zip`
 
 Source zip: `HBI_results-*.zip`
 
-- **File naming**: HBI delivers results as `alpine_catalogue_summary_full_variable_backslip.csv` and `alpine_catalogue_summary_site[1-3]_variable_backslip.csv`. Renamed to `alpine_varying_dip_event_info.csv` and `alpine_varying_dip_site[1-3]_event_info.csv`.
+- **File naming**: HBI delivers results as `Alpine_catalogue_summary_full_{jobid}_*.csv` and `Alpine_catalogue_summary_station{n}_{jobid}_*.csv`. `process.hbi.py` reads `Alpine_jobid_readme.txt` and writes `alpine_hbi_{jobid}_{scenario}_event_info.csv` bundles automatically.
 - **Missing event columns**: HBI does not provide `m0_Nm`, `area_m2`, or `dt_s`. These columns are present in the renamed file with value `nan`.
-- **Site file column casing**: HBI site files use `mw`, `slip_m`, `Raked_deg`. Renamed to `Mw`, `Slip_m`, `Rake_deg`.
+- **Site file column casing**: HBI site files use `rake` (not `Raked_deg`). `process.hbi.py` maps it to `Rake_deg` automatically.
 
-If HBI delivers updated results in the future, apply the same renaming and column-padding steps before running analytics.
+If HBI delivers updated results, drop the new raw CSVs into `HBI_results/` and re-run `process.hbi.py` (or `run.comparison.sh`).

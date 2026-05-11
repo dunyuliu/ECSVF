@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Plot accumulated coseismic slip and long-term slip rate for an EQquasi case.
+Plot accumulated slip and long-term slip rate for an EQquasi case.
 
 Produces three separate figures:
   1. Individual earthquake slip profiles (colored by time)
-  2. Running accumulated coseismic slip
-  3. Long-term coseismic slip rate along fault strike
+  2. Running accumulated slip
+  3. Long-term slip rate along fault strike
 
-Each Q folder's fault.r.nc contains the coseismic slip distribution for that
+Each Q folder's fault.r.nc contains the slip distribution for that
 earthquake. Slip is extracted at DEPTH_PCT (88%) depth, consistent with other
 post-processing scripts in this project.
 
@@ -58,7 +58,7 @@ DEPTH_PCT = 88.0
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Plot accumulated EQquasi coseismic slip along fault strike.")
+    parser = argparse.ArgumentParser(description="Plot accumulated EQquasi slip along fault strike.")
     parser.add_argument("--case-dir", type=str, required=True,
                         help="Path to EQquasi case directory containing Q* folders")
     parser.add_argument("--outdir", type=str, default=None,
@@ -182,7 +182,7 @@ def main() -> None:
     cbar.set_label("Elapsed Time (yr)", fontweight="bold")
     cbar.ax.tick_params(labelsize=11)
     ax.set_xlabel("Along-Strike Distance (km)")
-    ax.set_ylabel("Coseismic Slip (m)")
+    ax.set_ylabel("Slip (m)")
     ax.set_title("Individual Earthquake Slip Profiles")
     ax.grid(True, alpha=0.3)
     style_axis(ax)
@@ -206,7 +206,7 @@ def main() -> None:
     cbar2.ax.tick_params(labelsize=11)
     ax.set_xlabel("Along-Strike Distance (km)")
     ax.set_ylabel("Accumulated Slip (m)")
-    ax.set_title("Running Accumulated Coseismic Slip")
+    ax.set_title("Running Accumulated Slip")
     ax.legend(loc="upper left", frameon=False)
     ax.grid(True, alpha=0.3)
     style_axis(ax)
@@ -223,7 +223,7 @@ def main() -> None:
     ax.plot(distance_km, slip_rate_mm_yr, color="black", linewidth=LINE_WIDTH)
     ax.set_xlabel("Along-Strike Distance (km)")
     ax.set_ylabel("Slip Rate (mm/yr)")
-    ax.set_title(f"Long-Term Coseismic Slip Rate ({t_arr.max():.0f} yr)")
+    ax.set_title(f"Long-Term Slip Rate ({t_arr.max():.0f} yr)")
     ax.grid(True, alpha=0.3)
     style_axis(ax)
     fig.suptitle(subtitle, fontsize=11, fontweight="bold")

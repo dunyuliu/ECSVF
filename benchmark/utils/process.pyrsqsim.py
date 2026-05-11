@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 
-SECONDS_PER_YEAR = 3.15e7
+SECONDS_PER_YEAR = 365.25 * 24.0 * 3600.0
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RESULTS_DIR = REPO_ROOT.parent / "PyRSQSim.dev/examples/alpine/results/variable_dip_1km_5km"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "benchmark/Simulation_results/PyRSQSim_results"
@@ -247,7 +247,8 @@ def main() -> None:
         reconstructed_ids = np.where(event_slip > CATALOG_SLIP_EPS)[0]
         if not np.array_equal(reconstructed_ids, rupture_ids):
             raise RuntimeError(f"Catalog element_ids do not match reconstructed slipped elements for event {event_id}")
-        if not math.isclose(float(time_s[end_idx] / SECONDS_PER_YEAR), float(catalog_row["time_years"]), rel_tol=0.0, abs_tol=1.0e-9):
+        # rel_tol=5e-3 accommodates catalogs written with the legacy 3.15e7 s/yr constant (0.18% off)
+        if not math.isclose(float(time_s[end_idx] / SECONDS_PER_YEAR), float(catalog_row["time_years"]), rel_tol=5e-3, abs_tol=0.0):
             raise RuntimeError(f"Catalog end time does not match history segment end for event {event_id}")
 
         t0_s = float(time_s[start_idx])

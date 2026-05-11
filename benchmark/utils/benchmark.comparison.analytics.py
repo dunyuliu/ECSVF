@@ -101,8 +101,41 @@ def style_axis(ax) -> None:
         label.set_fontweight("bold")
 
 
+_SOURCE_SHORT = {
+    "EQquasi": "EQ",
+    "MCQsim": "MCQ",
+    "RSQSim": "RSQ",
+    "PyRSQSim": "pRSQ",
+    "HBI": "HBI",
+}
+
+
+def shorten_label(label: str) -> str:
+    source, _, bundle_id = label.partition(":")
+    src = _SOURCE_SHORT.get(source, source)
+    bid = bundle_id.lower()
+    if "no_dip_change" in bid or "nodipchange" in bid:
+        scenario = "noDip"
+    elif "varying_dip" in bid or "varydip" in bid:
+        scenario = "vDip"
+    elif "planar" in bid:
+        scenario = "planar"
+    else:
+        scenario = bundle_id
+    m = re.search(r"_(\d{6,})[_]", bundle_id + "_")
+    if m:
+        return f"{src}:{m.group(1)}-{scenario}"
+    return f"{src}:{scenario}"
+
+
 def style_legend(ax, loc: str = "best"):
-    legend = ax.legend(frameon=False, loc=loc)
+    legend = ax.legend(
+        frameon=False,
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1),
+        borderaxespad=0,
+        fontsize=9,
+    )
     if legend is None:
         return None
     for text in legend.get_texts():
@@ -367,7 +400,7 @@ def remove_if_unwritten(path: Path, written: bool) -> None:
 
 
 def plot_event_mw_histogram(bundles: list[Bundle], outdir: Path) -> None:
-    output_path = outdir / "event_mw_histogram.png"
+    output_path = outdir / "mw_histogram.png"
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
     plotted = False
     bundle_series: list[tuple[Bundle, np.ndarray]] = []
@@ -388,80 +421,105 @@ def plot_event_mw_histogram(bundles: list[Bundle], outdir: Path) -> None:
         line_styles = ["-", "--", "-.", ":"]
 
         for idx, (bundle, values) in enumerate(bundle_series):
-            density, edges = np.histogram(values, bins=bins, density=True)
+            counts, edges = np.histogram(values, bins=bins)
+            rel_freq = counts / counts.sum()
             centers = 0.5 * (edges[:-1] + edges[1:])
             ax.plot(
                 centers,
-                density,
+                rel_freq,
                 linestyle=line_styles[idx % len(line_styles)],
                 linewidth=LINE_WIDTH,
-                label=f"{bundle.label} (n={values.size})",
+                label=f"{shorten_label(bundle.label)} (n={values.size})",
             )
             plotted = True
 
         ax.set_title("Event Magnitude Distribution")
         ax.set_xlabel("Mw")
-        ax.set_ylabel("Density")
+        ax.set_ylabel("Relative Frequency")
         ax.grid(True, alpha=0.3)
         style_axis(ax)
         style_legend(ax)
     if plotted:
         fig.tight_layout()
-        fig.savefig(output_path, dpi=PUBLICATION_DPI)
+        fig.savefig(output_path, dpi=PUBLICATION_DPI, bbox_inches="tight")
     plt.close(fig)
     remove_if_unwritten(output_path, plotted)
 
 
-def plot_recurrence_cdf(bundles: list[Bundle], outdir: Path) -> None:
-    output_path = outdir / "recurrence_cdf.png"
+def plot_recurrence_histogram(bundles: list[Bundle], outdir: Path) -> None:
+    output_path = outdir / "recurrence_histogram.png"
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
     plotted = False
+    all_recurrences = []
+    bundle_recurrences = []
     for bundle in bundles:
         rows = load_rows(bundle.event_file, EVENT_NUMERIC_FIELDS)
         years = np.sort(np.array([row["t0_year"] for row in rows], dtype=float))
         recurrence = np.diff(years) if years.size >= 2 else np.array([], dtype=float)
         if recurrence.size == 0:
+            bundle_recurrences.append(None)
             continue
-        x = np.sort(recurrence)
-        y = np.arange(1, len(x) + 1) / len(x)
-        ax.step(x, y, where="post", label=bundle.label, linewidth=LINE_WIDTH)
-        plotted = True
+        bundle_recurrences.append((bundle, recurrence))
+        all_recurrences.append(recurrence)
+    if all_recurrences:
+        combined = np.concatenate(all_recurrences)
+        bins = np.linspace(combined.min(), combined.max(), min(30, combined.size // 3 + 2))
+        for item in bundle_recurrences:
+            if item is None:
+                continue
+            bundle, recurrence = item
+            counts, _ = np.histogram(recurrence, bins=bins)
+            ax.step(bins[:-1], counts / counts.sum(), where="post",
+                    label=shorten_label(bundle.label), linewidth=LINE_WIDTH)
+            plotted = True
     if plotted:
         ax.set_xlabel("Recurrence Interval (years)")
-        ax.set_ylabel("Empirical CDF")
-        ax.set_title("Recurrence Interval Comparison")
+        ax.set_ylabel("Relative Frequency")
+        ax.set_title("Recurrence Interval Distribution")
         ax.grid(True, alpha=0.3)
         style_axis(ax)
         style_legend(ax)
         fig.tight_layout()
-        fig.savefig(output_path, dpi=PUBLICATION_DPI)
+        fig.savefig(output_path, dpi=PUBLICATION_DPI, bbox_inches="tight")
     plt.close(fig)
     remove_if_unwritten(output_path, plotted)
 
 
-def plot_site_slip_cdfs(bundles: list[Bundle], outdir: Path, label_to_color: dict[str, str]) -> None:
+def plot_site_slip_histograms(bundles: list[Bundle], outdir: Path, label_to_color: dict[str, str]) -> None:
     for site in (1, 2, 3):
-        output_path = outdir / f"site{site}_slip_cdf.png"
+        output_path = outdir / f"site{site}_slip_histogram.png"
         fig, ax = plt.subplots(figsize=FIGURE_SIZE)
         plotted = False
+        all_slips = []
+        bundle_slips = []
         for bundle in bundles:
             rows = load_rows(bundle.site_files[site], SITE_NUMERIC_FIELDS)
-            slips = np.sort(np.array([row["Slip_m"] for row in rows], dtype=float))
+            slips = np.array([row["Slip_m"] for row in rows], dtype=float)
             if slips.size == 0:
+                bundle_slips.append(None)
                 continue
-            y = np.arange(1, len(slips) + 1) / len(slips)
-            ax.step(slips, y, where="post", label=bundle.label, linewidth=LINE_WIDTH,
-                    color=label_to_color[bundle.label])
-            plotted = True
+            bundle_slips.append((bundle, slips))
+            all_slips.append(slips)
+        if all_slips:
+            combined = np.concatenate(all_slips)
+            bins = np.linspace(combined.min(), combined.max(), min(30, combined.size // 3 + 2))
+            for item in bundle_slips:
+                if item is None:
+                    continue
+                bundle, slips = item
+                counts, _ = np.histogram(slips, bins=bins)
+                ax.step(bins[:-1], counts / counts.sum(), where="post",
+                        label=shorten_label(bundle.label), color=label_to_color[bundle.label], linewidth=LINE_WIDTH)
+                plotted = True
         if plotted:
             ax.set_xlabel("Slip (m)")
-            ax.set_ylabel("Empirical CDF")
-            ax.set_title(f"Site {site} Slip Comparison")
+            ax.set_ylabel("Relative Frequency")
+            ax.set_title(f"Site {site} Slip Distribution")
             ax.grid(True, alpha=0.3)
             style_axis(ax)
             style_legend(ax)
             fig.tight_layout()
-            fig.savefig(output_path, dpi=PUBLICATION_DPI)
+            fig.savefig(output_path, dpi=PUBLICATION_DPI, bbox_inches="tight")
         plt.close(fig)
         remove_if_unwritten(output_path, plotted)
 
@@ -514,7 +572,7 @@ def plot_rupture_extents(bundles: list[Bundle], outdir: Path, label_to_color: di
             ax.plot(
                 [s, n], [t, t],
                 color=color, linewidth=lw, alpha=alpha,
-                label=f"{bundle.label} (n={n_shown})" if not label_added else "_nolegend_",
+                label=f"{shorten_label(bundle.label)} (n={n_shown})" if not label_added else "_nolegend_",
                 solid_capstyle="butt",
             )
             label_added = True
@@ -528,7 +586,7 @@ def plot_rupture_extents(bundles: list[Bundle], outdir: Path, label_to_color: di
         style_axis(ax)
         style_legend(ax, loc="upper left")
         fig.tight_layout()
-        fig.savefig(output_path, dpi=PUBLICATION_DPI)
+        fig.savefig(output_path, dpi=PUBLICATION_DPI, bbox_inches="tight")
     plt.close(fig)
     remove_if_unwritten(output_path, plotted)
 
@@ -572,11 +630,13 @@ def plot_long_term_slip_rate(bundles: list[Bundle], outdir: Path, label_to_color
             event_rows_eq = load_rows(bundle.event_file, EVENT_NUMERIC_FIELDS)
             sbounds_eq = [r["sbound_NZTM_m"] for r in event_rows_eq if np.isfinite(r["sbound_NZTM_m"])]
             nbounds_eq = [r["nbound_NZTM_m"] for r in event_rows_eq if np.isfinite(r["nbound_NZTM_m"])]
+            if not sbounds_eq or not nbounds_eq:
+                continue
             northing_m = np.linspace(min(sbounds_eq), max(nbounds_eq), accumulated.size)
 
             slip_rate_mm_yr = accumulated / total_yr * 1e3
             ax.plot(northing_m / 1e3, slip_rate_mm_yr, linewidth=LINE_WIDTH,
-                    color=color, label=bundle.label)
+                    color=color, label=shorten_label(bundle.label))
             plotted = True
             continue
 
@@ -603,18 +663,155 @@ def plot_long_term_slip_rate(bundles: list[Bundle], outdir: Path, label_to_color
             slip_accum[in_rupture] += 0.5 * slip
         slip_rate_mm_yr = slip_accum / time_span_yr * 1e3
         ax.plot(bin_centers_km, slip_rate_mm_yr, linewidth=LINE_WIDTH,
-                color=color, label=bundle.label)
+                color=color, label=shorten_label(bundle.label))
         plotted = True
 
     if plotted:
         ax.set_xlabel("Along-Strike Northing (km NZTM)")
         ax.set_ylabel("Slip Rate (mm/yr)")
-        ax.set_title("Long-Term Coseismic Slip Rate")
+        ax.set_title("Long-Term Slip Rate")
         ax.grid(True, alpha=0.3)
         style_axis(ax)
         style_legend(ax)
         fig.tight_layout()
-        fig.savefig(output_path, dpi=PUBLICATION_DPI)
+        fig.savefig(output_path, dpi=PUBLICATION_DPI, bbox_inches="tight")
+    plt.close(fig)
+    remove_if_unwritten(output_path, plotted)
+
+
+def plot_mfd(bundles: list[Bundle], outdir: Path, label_to_color: dict[str, str]) -> None:
+    output_path = outdir / "mw_frequency.png"
+    fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+    plotted = False
+    for bundle in bundles:
+        rows = load_rows(bundle.event_file, EVENT_NUMERIC_FIELDS)
+        mw = np.sort(np.array([row["mw"] for row in rows], dtype=float))
+        if mw.size == 0:
+            continue
+        # Non-cumulative frequency (density)
+        bins = np.arange(math.floor(mw.min()*10)/10, math.ceil(mw.max()*10)/10 + 0.11, 0.1)
+        hist, edges = np.histogram(mw, bins=bins)
+        centers = 0.5 * (edges[:-1] + edges[1:])
+        ax.plot(centers, hist, label=shorten_label(bundle.label), color=label_to_color[bundle.label], linewidth=LINE_WIDTH)
+        plotted = True
+    if plotted:
+        ax.set_xlabel("Mw")
+        ax.set_ylabel("Frequency (N)")
+        ax.set_title("Magnitude-Frequency Distribution")
+        ax.set_yscale("log")
+        ax.grid(True, which="both", alpha=0.3)
+        style_axis(ax)
+        style_legend(ax)
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=PUBLICATION_DPI, bbox_inches="tight")
+    plt.close(fig)
+    remove_if_unwritten(output_path, plotted)
+
+
+def plot_gr_law(bundles: list[Bundle], outdir: Path, label_to_color: dict[str, str]) -> None:
+    output_path = outdir / "gutenberg_richter.png"
+    fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+    plotted = False
+    for bundle in bundles:
+        rows = load_rows(bundle.event_file, EVENT_NUMERIC_FIELDS)
+        mw = np.sort(np.array([row["mw"] for row in rows], dtype=float))
+        if mw.size == 0:
+            continue
+        # Cumulative frequency
+        mw_unique = np.unique(mw)
+        n_cumulative = np.array([np.sum(mw >= m) for m in mw_unique])
+        ax.plot(mw_unique, n_cumulative, label=shorten_label(bundle.label), color=label_to_color[bundle.label], linewidth=LINE_WIDTH)
+        plotted = True
+    if plotted:
+        ax.set_xlabel("Mw")
+        ax.set_ylabel("Cumulative Frequency N(Mw >= M)")
+        ax.set_title("Gutenberg-Richter Law")
+        ax.set_yscale("log")
+        ax.grid(True, which="both", alpha=0.3)
+        style_axis(ax)
+        style_legend(ax)
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=PUBLICATION_DPI, bbox_inches="tight")
+    plt.close(fig)
+    remove_if_unwritten(output_path, plotted)
+
+
+def plot_accumulated_slip_along_strike(bundles: list[Bundle], outdir: Path, label_to_color: dict[str, str]) -> None:
+    output_path = outdir / "slip_accumulated_along_strike.png"
+    BIN_WIDTH_M = 10e3
+    WINDOW_YR = 3000.0
+
+    fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+    plotted = False
+
+    for bundle in bundles:
+        color = label_to_color[bundle.label]
+
+        if bundle.source == "EQquasi":
+            case_dir = _find_eqquasi_case_dir(bundle.scenario)
+            if case_dir is None:
+                continue
+            plot_mod = _load_local_module("plot.accumulated.slip.eqquasi")
+            q_dirs = plot_mod.find_q_dirs(str(case_dir))
+            end_times_yr = plot_mod.cumulative_end_times_yr(q_dirs)
+
+            accumulated = None
+            for qd, t_yr in zip(q_dirs, end_times_yr):
+                if t_yr is None or t_yr > WINDOW_YR:
+                    continue
+                profile = plot_mod.load_slip_profile(qd)
+                if profile is None:
+                    continue
+                if accumulated is None:
+                    accumulated = np.zeros(profile.size)
+                accumulated += profile
+
+            if accumulated is None:
+                continue
+
+            event_rows_eq = load_rows(bundle.event_file, EVENT_NUMERIC_FIELDS)
+            sbounds_eq = [r["sbound_NZTM_m"] for r in event_rows_eq if np.isfinite(r["sbound_NZTM_m"])]
+            nbounds_eq = [r["nbound_NZTM_m"] for r in event_rows_eq if np.isfinite(r["nbound_NZTM_m"])]
+            northing_km = np.linspace(min(sbounds_eq), max(nbounds_eq), accumulated.size) / 1e3
+            ax.plot(northing_km, accumulated, linewidth=LINE_WIDTH,
+                    color=color, label=shorten_label(bundle.label))
+            plotted = True
+            continue
+
+        rows = load_rows(bundle.event_file, EVENT_NUMERIC_FIELDS)
+        sbounds = np.array([r["sbound_NZTM_m"] for r in rows], dtype=float)
+        nbounds = np.array([r["nbound_NZTM_m"] for r in rows], dtype=float)
+        max_slips = np.array([r["max_slip_m"] for r in rows], dtype=float)
+        years = np.array([r["t0_year"] for r in rows], dtype=float)
+        valid = np.isfinite(sbounds) & np.isfinite(nbounds) & np.isfinite(max_slips) & np.isfinite(years)
+        if not valid.any():
+            continue
+        sbounds, nbounds, max_slips, years = sbounds[valid], nbounds[valid], max_slips[valid], years[valid]
+        t_start = years.min()
+        window = years <= t_start + WINDOW_YR
+        sbounds, nbounds, max_slips = sbounds[window], nbounds[window], max_slips[window]
+
+        bin_edges = np.arange(sbounds.min(), nbounds.max() + BIN_WIDTH_M, BIN_WIDTH_M)
+        if bin_edges.size < 2:
+            continue
+        bin_centers_km = 0.5 * (bin_edges[:-1] + bin_edges[1:]) / 1e3
+        slip_accum = np.zeros(len(bin_centers_km))
+        for s, n, slip in zip(sbounds, nbounds, max_slips):
+            in_rupture = (bin_edges[1:] > s) & (bin_edges[:-1] < n)
+            slip_accum[in_rupture] += 0.5 * slip
+        ax.plot(bin_centers_km, slip_accum, linewidth=LINE_WIDTH,
+                color=color, label=shorten_label(bundle.label))
+        plotted = True
+
+    if plotted:
+        ax.set_xlabel("Along-Strike Northing (km NZTM)")
+        ax.set_ylabel("Accumulated Slip (m)")
+        ax.set_title(f"Accumulated Slip Along Strike (first {WINDOW_YR:.0f} yr)")
+        ax.grid(True, alpha=0.3)
+        style_axis(ax)
+        style_legend(ax)
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=PUBLICATION_DPI, bbox_inches="tight")
     plt.close(fig)
     remove_if_unwritten(output_path, plotted)
 
@@ -629,11 +826,14 @@ def write_overview(path: Path, bundles: list[Bundle]) -> None:
         "bundle_summary.csv",
         "pairwise_event_comparison.csv",
         "pairwise_site_comparison.csv",
-        "event_mw_histogram.png",
-        "recurrence_cdf.png",
-        "site1_slip_cdf.png",
-        "site2_slip_cdf.png",
-        "site3_slip_cdf.png",
+        "mw_histogram.png",
+        "mw_frequency.png",
+        "gutenberg_richter.png",
+        "recurrence_histogram.png",
+        "site1_slip_histogram.png",
+        "site2_slip_histogram.png",
+        "site3_slip_histogram.png",
+        "slip_accumulated_along_strike.png",
         "rupture_extents.png",
         "long_term_slip_rate.png",
     ]
@@ -660,8 +860,11 @@ def main() -> None:
     write_csv(outdir / "pairwise_event_comparison.csv", event_rows)
     write_csv(outdir / "pairwise_site_comparison.csv", site_rows)
     plot_event_mw_histogram(bundles, outdir)
-    plot_recurrence_cdf(bundles, outdir)
-    plot_site_slip_cdfs(bundles, outdir, label_to_color)
+    plot_mfd(bundles, outdir, label_to_color)
+    plot_gr_law(bundles, outdir, label_to_color)
+    plot_recurrence_histogram(bundles, outdir)
+    plot_site_slip_histograms(bundles, outdir, label_to_color)
+    plot_accumulated_slip_along_strike(bundles, outdir, label_to_color)
     plot_rupture_extents(bundles, outdir, label_to_color)
     plot_long_term_slip_rate(bundles, outdir, label_to_color)
     write_overview(outdir / "README.txt", bundles)

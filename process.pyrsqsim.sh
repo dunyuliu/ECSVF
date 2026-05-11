@@ -17,4 +17,5 @@ python "${ROOT_DIR}/benchmark/utils/process.pyrsqsim.py" \
   --stl "${PYRSQSIM_STL}" \
   --output-dir "${PYRSQSIM_OUTPUT}" \
   --prefix alpine_varying_dip_5km \
-  --hypocenter-policy onset_centroid
+  --hypocenter-policy onset_centroid \
+  --site-slip-threshold 0.5

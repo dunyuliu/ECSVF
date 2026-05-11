@@ -11,6 +11,7 @@ rm -rf "${ANALYTICS_OUTPUT}"
 
 bash "${ROOT_DIR}/process.eqquasi.sh"
 bash "${ROOT_DIR}/process.pyrsqsim.sh"
+python "${ROOT_DIR}/benchmark/utils/process.hbi.py"
 
 python "${ROOT_DIR}/benchmark/utils/benchmark.comparison.analytics.py" \
   --simulation-root "${ROOT_DIR}/benchmark/Simulation_results" \

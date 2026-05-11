@@ -18,33 +18,39 @@ python "${ROOT_DIR}/benchmark/utils/process.eqquasi.py" \
   --geometry-npz "${PLANAR_GEOM}" \
   --output-dir "${EQQ_OUTPUT}" \
   --prefix alpine_planar \
-  --slip-rate-threshold 0.1
+  --slip-rate-threshold 0.1 \
+  --site-slip-threshold 0.5
 
 python "${ROOT_DIR}/benchmark/utils/verify.eqquasi.geometry.conversion.py" \
   --case-dir "${PLANAR_CASE}" \
   --geometry-npz "${PLANAR_GEOM}" \
   --export-dir "${EQQ_OUTPUT}" \
   --prefix alpine_planar \
-  --slip-rate-threshold 0.1
+  --slip-rate-threshold 0.1 \
+  --site-slip-threshold 0.5
 
 python "${ROOT_DIR}/benchmark/utils/process.eqquasi.py" \
   --input-dir "${NO_DIP_CASE}" \
   --output-dir "${EQQ_OUTPUT}" \
-  --slip-rate-threshold 0.1
+  --slip-rate-threshold 0.1 \
+  --site-slip-threshold 0.5
 
 python "${ROOT_DIR}/benchmark/utils/verify.eqquasi.geometry.conversion.py" \
   --case-dir "${NO_DIP_CASE}" \
   --export-dir "${EQQ_OUTPUT}" \
   --prefix alpine_no_dip_change \
-  --slip-rate-threshold 0.1
+  --slip-rate-threshold 0.1 \
+  --site-slip-threshold 0.5
 
 python "${ROOT_DIR}/benchmark/utils/process.eqquasi.py" \
   --input-dir "${VARY_DIP_CASE}" \
   --output-dir "${EQQ_OUTPUT}" \
-  --slip-rate-threshold 0.1
+  --slip-rate-threshold 0.1 \
+  --site-slip-threshold 0.5
 
 python "${ROOT_DIR}/benchmark/utils/verify.eqquasi.geometry.conversion.py" \
   --case-dir "${VARY_DIP_CASE}" \
   --export-dir "${EQQ_OUTPUT}" \
   --prefix alpine_varying_dip \
-  --slip-rate-threshold 0.1
+  --slip-rate-threshold 0.1 \
+  --site-slip-threshold 0.5
