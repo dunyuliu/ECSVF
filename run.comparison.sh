@@ -15,4 +15,6 @@ python "${ROOT_DIR}/benchmark/utils/process.hbi.py"
 
 python "${ROOT_DIR}/benchmark/utils/benchmark.comparison.analytics.py" \
   --simulation-root "${ROOT_DIR}/benchmark/Simulation_results" \
-  --outdir "${ANALYTICS_OUTPUT}"
+  --outdir "${ANALYTICS_OUTPUT}" \
+  --max-per-source-scenario 1 \
+  --exclude no_dip_change

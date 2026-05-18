@@ -181,7 +181,34 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Compare complete Avi-style benchmark bundles.")
     parser.add_argument("--simulation-root", type=Path, default=BENCHMARK_ROOT / "Simulation_results")
     parser.add_argument("--outdir", type=Path, default=BENCHMARK_ROOT / "analytics")
+    parser.add_argument(
+        "--max-per-source-scenario",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Keep at most N bundles per (source, scenario) pair, sorted by bundle_id. "
+             "Useful to reduce plot clutter when one source contributes many runs.",
+    )
+    parser.add_argument(
+        "--exclude",
+        nargs="+",
+        default=[],
+        metavar="PATTERN",
+        help="Exclude bundles whose bundle_id contains any of these substrings.",
+    )
     return parser.parse_args()
+
+
+def cap_bundles(bundles: list[Bundle], max_n: int) -> list[Bundle]:
+    seen: dict[tuple[str, str], int] = {}
+    kept: list[Bundle] = []
+    for bundle in sorted(bundles, key=lambda b: (b.source, b.scenario, b.bundle_id)):
+        key = (bundle.source, bundle.scenario)
+        count = seen.get(key, 0)
+        if count < max_n:
+            kept.append(bundle)
+            seen[key] = count + 1
+    return kept
 
 
 def infer_scenario(name: str) -> str:
@@ -846,6 +873,10 @@ def write_overview(path: Path, bundles: list[Bundle]) -> None:
 def main() -> None:
     args = parse_args()
     bundles = discover_bundles(args.simulation_root.resolve())
+    if args.exclude:
+        bundles = [b for b in bundles if not any(p in b.bundle_id for p in args.exclude)]
+    if args.max_per_source_scenario is not None:
+        bundles = cap_bundles(bundles, args.max_per_source_scenario)
     outdir = args.outdir.resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
