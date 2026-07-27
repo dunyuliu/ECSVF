@@ -6,24 +6,27 @@ The benchmark layer should read from here, but cross-code conversion and compari
 
 ## Case Status
 
+Active benchmark cases (top-level):
+
 - `nz.bp5.qdc.dip50.2000.norm_6mm_yr`
   - planar benchmark case with `24` `Q*` cycle folders
-  - this is the active planar source for `benchmark/Simulation_results/EQquasi_results/alpine_planar_*`
+  - source for `benchmark/Simulation_results/EQquasi_results/alpine_planar_*`
 - `nz.bp5.qdc.noDipChange.2000.norm_6mm_yr.slowInitialLoad`
   - no-dip-change benchmark case with `21` `Q*` cycle folders
-  - this is the active no-dip-change source for `benchmark/Simulation_results/EQquasi_results/alpine_no_dip_change_*`
+  - source for `benchmark/Simulation_results/EQquasi_results/alpine_no_dip_change_*`
+  - excluded from comparison figures by default (`--exclude no_dip_change`)
 - `nz.bp5.qdc.varyDip20251202.2000.norm_6mm_yr.slowInitialLoad`
-  - varying-dip benchmark case with `18` `Q*` cycle folders
-  - this is the active varying-dip source for `benchmark/Simulation_results/EQquasi_results/alpine_varying_dip_*`
-  - this case uses the newer varying-dip mesh
-- `nz.bp5.qdc.varyDip.2000.norm_6mm_yr.slowInitialLoad`
-  - older varying-dip case with `23` `Q*` cycle folders
-  - no longer the shared benchmark source
-- `nz.bp5.qdc.varyDip.2000.norm_6mm_yr.slowInitialLoad.casedir.only`
-  - case-directory shell only
-  - no `Q*` results
+  - varying-dip benchmark case with `18` `Q*` cycle folders (still accumulating on Knox)
+  - source for `benchmark/Simulation_results/EQquasi_results/alpine_varying_dip_*`
+  - uses the newer varying-dip mesh (post-workshop geometry)
 
-Other directories here are older or alternate Alpine Fault runs and should be treated as archived cases unless you explicitly want to benchmark or post-process them.
+Archived cases (moved to `archive/`):
+
+- `nz.bp5.qdc.dip50.2000.norm0` — planar, zero-norm variant, not the benchmark source
+- `nz.bp5.qdc.dip90.4000` — dip-90 test run, not used in benchmark
+- `nz.bp5.qdc.noDipChange.2000.norm0.slowInitialLoad` — no-dip-change, zero-norm variant
+- `nz.bp5.qdc.varyDip.2000.norm_6mm_yr.slowInitialLoad` — older varying-dip case, superseded by varyDip20251202
+- `nz.bp5.qdc.varyDip.2000.norm_6mm_yr.slowInitialLoad.casedir.only` — case-directory shell, no Q* results
 
 ## Post-Processing
 
@@ -71,15 +74,18 @@ These case-local scripts are the reference logic for how times and cumulative sl
 
 ## Inventory
 
-Current top-level case inventory:
+Active top-level cases:
+
+- `nz.bp5.qdc.dip50.2000.norm_6mm_yr`: `24` `Q*`, `37` root PNGs
+- `nz.bp5.qdc.noDipChange.2000.norm_6mm_yr.slowInitialLoad`: `21` `Q*`, `23` root PNGs
+- `nz.bp5.qdc.varyDip20251202.2000.norm_6mm_yr.slowInitialLoad`: `18` `Q*`, `0` root PNGs
+
+Archived cases (under `archive/`):
 
 - `nz.bp5.qdc.dip50.2000.norm0`: `11` `Q*`, `36` root PNGs
-- `nz.bp5.qdc.dip50.2000.norm_6mm_yr`: `24` `Q*`, `37` root PNGs
 - `nz.bp5.qdc.dip90.4000`: `2` `Q*`, `1` root PNG
 - `nz.bp5.qdc.noDipChange.2000.norm0.slowInitialLoad`: `28` `Q*`, `65` root PNGs
-- `nz.bp5.qdc.noDipChange.2000.norm_6mm_yr.slowInitialLoad`: `21` `Q*`, `23` root PNGs
 - `nz.bp5.qdc.varyDip.2000.norm_6mm_yr.slowInitialLoad`: `23` `Q*`, `30` root PNGs
 - `nz.bp5.qdc.varyDip.2000.norm_6mm_yr.slowInitialLoad.casedir.only`: `0` `Q*`, `0` root PNGs
-- `nz.bp5.qdc.varyDip20251202.2000.norm_6mm_yr.slowInitialLoad`: `18` `Q*`, `0` root PNGs
 
 Legacy utilities that were formerly under `post_utility_dev/` were intentionally reduced to a small reference archive at `archive/post_utility_dev_varyDip_legacy/`. The old scratch tree is no longer part of the active results workflow.
