@@ -127,6 +127,10 @@ def main() -> None:
                 raise FileNotFoundError(p)
 
         event_rows = xlsx_to_rows(event_path, EVENT_COL_MAP, EVENT_FIELDS)
+        # SouthEnd_N / NorthEnd_N are delivered in km; benchmark format expects metres
+        for r in event_rows:
+            r["sbound_NZTM_m"] = float(r["sbound_NZTM_m"]) * 1e3
+            r["nbound_NZTM_m"] = float(r["nbound_NZTM_m"]) * 1e3
         event_rows = [r for r in event_rows if float(r["mw"]) > args.min_mw]
         if not event_rows:
             raise RuntimeError(f"No events above Mw {args.min_mw} for {prefix}")
